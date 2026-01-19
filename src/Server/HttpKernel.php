@@ -50,6 +50,7 @@ class HttpKernel
             }
 
             $request = $request->withParams($route['matchedParams'] ?? []);
+            RequestContext::set($request);
 
             if ($route['validation'] !== null) {
                 $this->runValidation($route, $request);
