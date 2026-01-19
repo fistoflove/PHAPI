@@ -13,7 +13,25 @@ if (php_sapi_name() !== 'cli') {
     exit('This script can only be run from command line.');
 }
 
-require __DIR__ . '/../vendor/autoload.php';
+$autoloadPaths = [
+    getcwd() . '/vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+    __DIR__ . '/../vendor/autoload.php',
+];
+
+$autoloadLoaded = false;
+foreach ($autoloadPaths as $autoloadPath) {
+    if (file_exists($autoloadPath)) {
+        require $autoloadPath;
+        $autoloadLoaded = true;
+        break;
+    }
+}
+
+if (!$autoloadLoaded) {
+    fwrite(STDERR, "Error: Composer autoload not found.\n");
+    exit(1);
+}
 
 if (!extension_loaded('swoole')) {
     echo "Error: Swoole extension is not loaded.\n";
