@@ -69,9 +69,14 @@ class Request
         }
 
         $contentType = strtolower($headers['content-type'] ?? '');
+
+        if (strpos($contentType, 'multipart/form-data') !== false) {
+            return $_POST ?? null;
+        }
+
         $raw = file_get_contents('php://input');
         if ($raw === '' || $raw === false) {
-            return null;
+            return $_POST ?? null;
         }
 
         if (strpos($contentType, 'application/json') !== false) {
@@ -83,8 +88,25 @@ class Request
         }
 
         if (strpos($contentType, 'application/x-www-form-urlencoded') !== false) {
+            if (!empty($_POST)) {
+                return $_POST;
+            }
             parse_str($raw, $parsed);
             return $parsed;
+        }
+
+        if (!empty($_POST)) {
+            return $_POST;
+        }
+
+        if ($contentType === '') {
+            $trimmed = ltrim($raw);
+            if ($trimmed !== '' && ($trimmed[0] === '{' || $trimmed[0] === '[')) {
+                $decoded = json_decode($raw, true);
+                if (json_last_error() === JSON_ERROR_NONE) {
+                    return $decoded;
+                }
+            }
         }
 
         return $raw;
