@@ -206,8 +206,13 @@ final class PHAPI
         string $validationType = 'body',
         ?string $name = null,
         $host = null
-    ): void {
-        $this->router->addRoute($method, $path, $handler, $middleware, $validationRules, $validationType, $name, $host);
+    ): int {
+        return $this->router->addRoute($method, $path, $handler, $middleware, $validationRules, $validationType, $name, $host);
+    }
+
+    public function updateRoute(int $index, array $route): void
+    {
+        $this->router->updateRoute($index, $route);
     }
 
     public function middleware($handler)

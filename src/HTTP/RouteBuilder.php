@@ -15,6 +15,7 @@ class RouteBuilder
     protected string $validationType = 'body';
     protected ?string $name = null;
     protected $host = null;
+    private ?int $routeIndex = null;
 
     public function __construct(PHAPI $api, string $method, string $path, $handler)
     {
@@ -37,6 +38,7 @@ class RouteBuilder
         } elseif (is_callable($middleware)) {
             $this->middleware[] = ['type' => 'inline', 'handler' => $middleware];
         }
+        $this->sync();
         return $this;
     }
 
@@ -44,24 +46,27 @@ class RouteBuilder
     {
         $this->validationRules = $rules;
         $this->validationType = $type;
+        $this->sync();
         return $this;
     }
 
     public function name(string $name): self
     {
         $this->name = $name;
+        $this->sync();
         return $this;
     }
 
     public function host($host): self
     {
         $this->host = $host;
+        $this->sync();
         return $this;
     }
 
     public function register(): void
     {
-        $this->api->registerRoute(
+        $this->routeIndex = $this->api->registerRoute(
             $this->method,
             $this->path,
             $this->handler,
@@ -71,6 +76,22 @@ class RouteBuilder
             $this->name,
             $this->host
         );
+    }
+
+    private function sync(): void
+    {
+        if ($this->routeIndex === null) {
+            return;
+        }
+
+        $this->api->updateRoute($this->routeIndex, [
+            'handler' => $this->handler,
+            'middleware' => $this->middleware,
+            'validation' => $this->validationRules,
+            'validationType' => $this->validationType,
+            'name' => $this->name,
+            'host' => $this->host,
+        ]);
     }
 
     public function get(string $path, $handler): RouteBuilder

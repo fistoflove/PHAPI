@@ -17,7 +17,7 @@ class Router
         string $validationType = 'body',
         ?string $name = null,
         $host = null
-    ): void {
+    ): int {
         $fullPath = $this->getFullPath($path);
         $segments = $this->parseTemplate($fullPath);
         $regex = $this->compilePath($segments);
@@ -36,9 +36,33 @@ class Router
         ];
 
         $this->routes[] = $route;
+        $index = array_key_last($this->routes);
 
         if ($name !== null) {
             $this->namedRoutes[$name] = $route;
+        }
+
+        return $index;
+    }
+
+    public function updateRoute(int $index, array $updates): void
+    {
+        if (!isset($this->routes[$index])) {
+            throw new \RuntimeException("Route index {$index} not found");
+        }
+
+        $current = $this->routes[$index];
+        $oldName = $current['name'] ?? null;
+
+        $route = array_merge($current, $updates);
+        $this->routes[$index] = $route;
+
+        if ($oldName !== null && $oldName !== $route['name']) {
+            unset($this->namedRoutes[$oldName]);
+        }
+
+        if ($route['name'] !== null) {
+            $this->namedRoutes[$route['name']] = $route;
         }
     }
 
