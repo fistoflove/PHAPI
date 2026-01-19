@@ -1,0 +1,64 @@
+{
+    "name": "phapi/phapi",
+    "version": "1.0.0",
+    "description": "A lightweight, high-performance wrapper for Swoole HTTP server with routing, middleware, validation, CORS, and async task support",
+    "keywords": [
+        "swoole",
+        "http-server",
+        "async",
+        "coroutine",
+        "api",
+        "framework",
+        "routing",
+        "middleware",
+        "validation"
+    ],
+    "type": "library",
+    "license": "MIT",
+    "homepage": "https://github.com/phapi/phapi",
+    "support": {
+        "issues": "https://github.com/phapi/phapi/issues",
+        "source": "https://github.com/phapi/phapi"
+    },
+    "authors": [
+        {
+            "name": "PHAPI Contributors"
+        }
+    ],
+    "require": {
+        "php": "^8.1",
+        "amphp/amp": "^3.1",
+        "amphp/http-client": "^5.3"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PHAPI\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PHAPI\\Tests\\": "tests/"
+        }
+    },
+    "suggest": {
+        "ext-swoole": "Required for the Swoole runtime.",
+        "amphp/http-client": "Enable async HTTP for the AMPHP runtime."
+    },
+    "bin": [
+        "bin/phapi-run",
+        "bin/phapi-jobs"
+    ],
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit --testdox",
+        "phpunit": "phpunit"
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true
+    }
+}

@@ -1,0 +1,50 @@
+#!/usr/bin/env php
+<?php
+
+if (php_sapi_name() !== 'cli') {
+    exit('This script can only be run from command line.' . PHP_EOL);
+}
+
+$script = $argv[1] ?? null;
+if ($script === null) {
+    fwrite(STDERR, "Usage: php bin/phapi-jobs path/to/app.php\n");
+    exit(1);
+}
+
+if (!file_exists($script)) {
+    fwrite(STDERR, "Error: Script '{$script}' not found.\n");
+    exit(1);
+}
+
+require __DIR__ . '/../vendor/autoload.php';
+
+putenv('PHAPI_RUN_MODE=jobs');
+
+$api = require $script;
+if (!$api instanceof \PHAPI\PHAPI) {
+    $api = \PHAPI\PHAPI::lastInstance();
+}
+
+if (!$api instanceof \PHAPI\PHAPI) {
+    fwrite(STDERR, "Error: Unable to locate PHAPI instance after loading app.\n");
+    exit(1);
+}
+
+$results = $api->runJobs();
+if (empty($results)) {
+    echo "No jobs due.\n";
+    exit(0);
+}
+
+foreach ($results as $result) {
+    $line = sprintf(
+        "%s: %s (%sms)\n",
+        $result['job'],
+        $result['status'],
+        $result['duration_ms']
+    );
+    if (isset($result['error'])) {
+        $line = rtrim($line) . " - " . $result['error'] . "\n";
+    }
+    echo $line;
+}
