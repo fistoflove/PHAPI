@@ -183,6 +183,31 @@ $api->realtime()->broadcast('channel', ['event' => 'ping']);
 - Swoole: WebSocket broadcast
 - FPM/AMPHP: fallback/no-op (configure a fallback handler)
 
+### WebSocket Subscriptions (Swoole)
+
+```php
+$api->setWebSocketHandler(function ($server, $frame, $driver) {
+    $data = json_decode($frame->data ?? '', true);
+    if (!is_array($data)) {
+        return;
+    }
+
+    if (($data['action'] ?? '') === 'subscribe' && !empty($data['channel'])) {
+        $driver->subscribe($frame->fd, $data['channel']);
+    }
+
+    if (($data['action'] ?? '') === 'unsubscribe' && !empty($data['channel'])) {
+        $driver->unsubscribe($frame->fd, $data['channel']);
+    }
+});
+```
+
+Broadcast only to subscribers:
+
+```php
+$api->realtime()->broadcast('player:123', ['event' => 'ping']);
+```
+
 ## SQLite Helpers
 
 ```php

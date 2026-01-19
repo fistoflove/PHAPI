@@ -15,6 +15,7 @@ class SwooleDriver implements HttpRuntimeDriver
     private ?\Swoole\Server $server = null;
     private array $connections = [];
     private $onWorkerStart = null;
+    private $webSocketHandler = null;
 
     public function __construct(string $host = '0.0.0.0', int $port = 9501, bool $enableWebSockets = false)
     {
@@ -31,14 +32,18 @@ class SwooleDriver implements HttpRuntimeDriver
             $this->server = $server;
 
             $server->on('open', function (\Swoole\WebSocket\Server $server, $request) {
-                $this->connections[$request->fd] = true;
+                $this->connections[$request->fd] = ['channels' => []];
             });
 
             $server->on('close', function (\Swoole\WebSocket\Server $server, int $fd) {
                 unset($this->connections[$fd]);
             });
 
-            $server->on('message', function () {
+            $server->on('message', function (\Swoole\WebSocket\Server $server, $frame) {
+                if ($this->webSocketHandler !== null) {
+                    $handler = $this->webSocketHandler;
+                    $handler($server, $frame, $this);
+                }
             });
 
             if ($this->onWorkerStart !== null) {
@@ -98,6 +103,30 @@ class SwooleDriver implements HttpRuntimeDriver
     public function onWorkerStart(callable $handler): void
     {
         $this->onWorkerStart = $handler;
+    }
+
+    public function setWebSocketHandler(callable $handler): void
+    {
+        $this->webSocketHandler = $handler;
+    }
+
+    public function subscribe(int $fd, string $channel): void
+    {
+        if ($channel === '') {
+            return;
+        }
+        if (!isset($this->connections[$fd])) {
+            $this->connections[$fd] = ['channels' => []];
+        }
+        $this->connections[$fd]['channels'][$channel] = true;
+    }
+
+    public function unsubscribe(int $fd, string $channel): void
+    {
+        if ($channel === '' || !isset($this->connections[$fd]['channels'])) {
+            return;
+        }
+        unset($this->connections[$fd]['channels'][$channel]);
     }
 
     private function buildRequest($request): Request

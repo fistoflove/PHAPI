@@ -45,6 +45,7 @@ final class PHAPI
     private JobsManager $jobs;
     private AuthManager $auth;
     private $realtimeFallback = null;
+    private $webSocketHandler = null;
 
     public function __construct(array $config = [])
     {
@@ -103,6 +104,15 @@ final class PHAPI
     {
         $this->realtimeFallback = $fallback;
         $this->registerCoreServices();
+        return $this;
+    }
+
+    public function setWebSocketHandler(callable $handler): self
+    {
+        $this->webSocketHandler = $handler;
+        if ($this->driver instanceof SwooleDriver) {
+            $this->driver->setWebSocketHandler($handler);
+        }
         return $this;
     }
 
@@ -446,6 +456,10 @@ final class PHAPI
             $this->driver instanceof SwooleDriver ? $this->driver : null,
             $fallback
         ));
+
+        if ($this->driver instanceof SwooleDriver && $this->webSocketHandler !== null) {
+            $this->driver->setWebSocketHandler($this->webSocketHandler);
+        }
     }
 
     private function registerSafetyMiddleware(): void

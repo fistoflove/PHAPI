@@ -20,8 +20,14 @@ class SwooleRealtime implements Realtime
             'message' => $message,
         ], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
 
-        foreach ($this->connections as $fd => $active) {
-            if ($active) {
+        foreach ($this->connections as $fd => $info) {
+            if ($channel === '') {
+                $this->server->push($fd, $payload);
+                continue;
+            }
+
+            $channels = $info['channels'] ?? [];
+            if (!empty($channels[$channel])) {
                 $this->server->push($fd, $payload);
             }
         }
