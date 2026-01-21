@@ -28,6 +28,7 @@ $api = new PHAPI([
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
+    'default_endpoints' => false,
 ]);
 
 $api->get('/', function (): Response {
@@ -42,8 +43,40 @@ $api->run();
 - `APP_RUNTIME=fpm` (default)
 - `APP_RUNTIME=fpm_amphp` or `amphp`
 - `APP_RUNTIME=swoole`
+- `APP_RUNTIME=portable_swoole`
 
 Swoole uses the native PHP extension only.
+
+Portable Swoole will attempt to load a bundled `swoole.so` from
+`portable-swoole/bin/extensions` or a path provided via:
+
+- `PHAPI_PORTABLE_SWOOLE_DIR`
+- `PHAPI_PORTABLE_SWOOLE_EXT`
+
+If your PHP build does not allow `dl()`, run via:
+
+```bash
+APP_RUNTIME=portable_swoole php -d extension=/path/to/swoole.so app.php
+```
+
+Or use the runner:
+
+```bash
+APP_RUNTIME=portable_swoole php vendor/bin/phapi-run app.php
+```
+
+PHAPI registers `/health` and `/monitor` by default. Disable them if you want to provide your own handlers:
+
+```php
+$api = new PHAPI([
+    'default_endpoints' => [
+        'health' => true,
+        'monitor' => false,
+    ],
+]);
+```
+
+When using the runner, PHAPI will mark the runtime as `portable_swoole` in `/health`.
 
 ## Routing
 

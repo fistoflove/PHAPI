@@ -1,8 +1,9 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Database;
 
-use PHAPI\Database\ConnectionManager;
 use PDOException;
 
 /**
@@ -53,11 +54,11 @@ class Schema
         ");
 
         // Create indexes
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_documents_key ON documents(key)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_options_key ON options(key)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_options_autoload ON options(autoload)");
-        $db->exec("CREATE INDEX IF NOT EXISTS idx_options_expires ON options(expires_at)");
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_documents_type ON documents(type)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_documents_key ON documents(key)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_options_key ON options(key)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_options_autoload ON options(autoload)');
+        $db->exec('CREATE INDEX IF NOT EXISTS idx_options_expires ON options(expires_at)');
     }
 
     /**
@@ -74,6 +75,9 @@ class Schema
         try {
             $db = ConnectionManager::getConnection();
             $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='options'");
+            if ($result === false) {
+                return false;
+            }
             return $result->rowCount() > 0;
         } catch (PDOException $e) {
             return false;

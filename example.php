@@ -11,6 +11,7 @@ $api = new PHAPI([
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
+    'default_endpoints' => false,
     'max_body_bytes' => 1024 * 1024,
     'access_logger' => function ($request, $response, array $meta) {
         $line = sprintf(
@@ -39,7 +40,9 @@ $api = new PHAPI([
 // Security headers middleware (basic defaults)
 $api->enableSecurityHeaders();
 
-DatabaseFacade::configure(__DIR__ . '/var/log.sqlite');
+if (class_exists(PDO::class) && extension_loaded('pdo_sqlite')) {
+    DatabaseFacade::configure(__DIR__ . '/var/log.sqlite');
+}
 
 $api->get('/', function (): Response {
     return Response::json([
@@ -52,15 +55,16 @@ $api->get('/health', function (): Response {
     $request = PHAPI::request();
     $app = PHAPI::app();
     $start = $request?->server()['REQUEST_TIME_FLOAT'] ?? microtime(true);
-    $durationMs = round((microtime(true) - $start) * 1000, 2);
+    $durationUs = (int)round((microtime(true) - $start) * 1000000);
 
     return Response::json([
         'ok' => true,
         'time' => date('c'),
-        'runtime' => $app?->capabilities()->supportsPersistentState() ? 'swoole' : ($app?->capabilities()->supportsAsyncIo() ? 'fpm_amphp' : 'fpm'),
-        'response_ms' => $durationMs,
+        'runtime' => $app?->runtimeName(),
+        'response_us' => $durationUs,
     ]);
 });
+
 
 $api->get('/users/{id}', function (): Response {
     $request = PHAPI::request();

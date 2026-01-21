@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Server;
 
 /**
@@ -7,14 +9,17 @@ namespace PHAPI\Server;
  */
 class CORSHandler
 {
+    /**
+     * @var array<string, mixed>|null
+     */
     private ?array $config = null;
 
     /**
      * Enable CORS with configuration
      *
-     * @param array|string|null $origins Allowed origins ('*' for all, array for specific origins)
-     * @param array $methods Allowed HTTP methods
-     * @param array $headers Allowed headers
+     * @param array<int, string>|string|null $origins Allowed origins ('*' for all, array for specific origins)
+     * @param array<int, string> $methods Allowed HTTP methods
+     * @param array<int, string> $headers Allowed headers
      * @param bool $credentials Allow credentials
      * @param int $maxAge Preflight cache time in seconds
      * @return self
@@ -26,7 +31,7 @@ class CORSHandler
             'methods' => $methods,
             'headers' => $headers,
             'credentials' => $credentials,
-            'maxAge' => $maxAge
+            'maxAge' => $maxAge,
         ];
         return $this;
     }
@@ -77,6 +82,7 @@ class CORSHandler
 
         $origin = $request->header['origin'] ?? null;
         $origins = $this->config['origins'];
+        $credentials = (bool)$this->config['credentials'];
 
         $allowedOrigin = $this->determineOrigin($origins, $origin);
         if ($allowedOrigin === null) {
@@ -88,7 +94,7 @@ class CORSHandler
         $response->header('Access-Control-Allow-Headers', implode(', ', $this->config['headers']));
         $response->header('Access-Control-Max-Age', (string)$this->config['maxAge']);
 
-        if ($this->config['credentials']) {
+        if ($credentials) {
             $response->header('Access-Control-Allow-Credentials', 'true');
         }
     }
@@ -96,7 +102,7 @@ class CORSHandler
     /**
      * Determine allowed origin based on configuration
      *
-     * @param array|string|null $origins Configured origins
+     * @param array<int, string>|string|null $origins Configured origins
      * @param string|null $requestOrigin Request origin header
      * @return string|null Allowed origin or null if not allowed
      */
@@ -104,9 +110,15 @@ class CORSHandler
     {
         $allowedOrigin = '*';
 
+        $config = $this->config;
+        if ($config === null) {
+            return null;
+        }
+
+        $credentials = (bool)$config['credentials'];
         if ($origins !== '*' && $origins !== null) {
             if (is_array($origins)) {
-                if ($requestOrigin !== null && in_array($requestOrigin, $origins)) {
+                if ($requestOrigin !== null && in_array($requestOrigin, $origins, true)) {
                     $allowedOrigin = $requestOrigin;
                 } else {
                     return null;
@@ -114,7 +126,7 @@ class CORSHandler
             } else {
                 $allowedOrigin = $origins;
             }
-        } elseif ($origins === '*' && $this->config['credentials']) {
+        } elseif ($origins === '*' && $credentials) {
             $allowedOrigin = $requestOrigin ?? '*';
         }
 
@@ -124,11 +136,10 @@ class CORSHandler
     /**
      * Get CORS configuration
      *
-     * @return array|null
+     * @return array<string, mixed>|null
      */
     public function getConfig(): ?array
     {
         return $this->config;
     }
 }
-

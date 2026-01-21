@@ -1,0 +1,17 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+    stubFiles:
+        - stubs/swoole.stub.php
+    scanFiles:
+        - stubs/swoole.stub.php
+    checkMissingTypehints: true
+    checkMissingIterableValueType: true
+    checkMissingCallableSignature: true
+    checkMissingVarTagTypehint: true
+    parallel:
+        maximumNumberOfProcesses: 0

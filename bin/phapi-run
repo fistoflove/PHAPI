@@ -33,7 +33,26 @@ if (!$autoloadLoaded) {
     exit(1);
 }
 
-if (!extension_loaded('swoole')) {
+$runtime = getenv('APP_RUNTIME') ?: 'fpm';
+
+if ($runtime === 'portable_swoole') {
+    if (!extension_loaded('swoole')) {
+        $extPath = \PHAPI\Runtime\PortableSwooleLoader::resolveExtensionPathFromConfig();
+        if ($extPath && file_exists($extPath)) {
+            $args = array_slice($argv, 1);
+            $script = $args[0] ?? 'app.php';
+            $escapedArgs = array_map('escapeshellarg', $args);
+            $command = 'PHAPI_PORTABLE_SWOOLE_USED=1 ' . escapeshellarg(PHP_BINARY) . ' -d ' . escapeshellarg('extension=' . $extPath) . ' ' . implode(' ', $escapedArgs);
+            passthru($command, $status);
+            exit($status);
+        }
+        if (!\PHAPI\Runtime\PortableSwooleLoader::load()) {
+            echo "Error: Portable Swoole runtime requested but Swoole could not be loaded.\n";
+            echo "Set PHAPI_PORTABLE_SWOOLE_DIR or PHAPI_PORTABLE_SWOOLE_EXT, run via bin/phapi-run, or use -d extension=/path/to/swoole.so.\n";
+            exit(1);
+        }
+    }
+} elseif (!extension_loaded('swoole')) {
     echo "Error: Swoole extension is not loaded.\n";
     echo "Please install the native Swoole PHP extension.\n";
     exit(1);

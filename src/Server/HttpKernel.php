@@ -1,10 +1,12 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Server;
 
 use PHAPI\Core\Container;
-use PHAPI\Exceptions\RouteNotFoundException;
 use PHAPI\Exceptions\MethodNotAllowedException;
+use PHAPI\Exceptions\RouteNotFoundException;
 use PHAPI\Exceptions\ValidationException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
@@ -18,8 +20,21 @@ class HttpKernel
     private MiddlewareManager $middleware;
     private ErrorHandler $errorHandler;
     private Container $container;
+    /**
+     * @var callable(Request, Response, array<string, mixed>): void|null
+     */
     private $accessLogger;
 
+    /**
+     * Create an HTTP kernel instance.
+     *
+     * @param Router $router
+     * @param MiddlewareManager $middleware
+     * @param ErrorHandler $errorHandler
+     * @param Container $container
+     * @param (callable(Request, Response, array<string, mixed>): void)|null $accessLogger
+     * @return void
+     */
     public function __construct(
         Router $router,
         MiddlewareManager $middleware,
@@ -34,6 +49,12 @@ class HttpKernel
         $this->accessLogger = $accessLogger;
     }
 
+    /**
+     * Handle an incoming request and return a response.
+     *
+     * @param Request $request
+     * @return Response
+     */
     public function handle(Request $request): Response
     {
         RequestContext::set($request);
@@ -43,7 +64,7 @@ class HttpKernel
             $match = $this->router->match($request->method(), $request->path(), $request->host());
             $route = $match['route'];
             if ($route === null) {
-                if (!empty($match['allowed'])) {
+                if ($match['allowed'] !== []) {
                     throw new MethodNotAllowedException($match['allowed']);
                 }
                 throw new RouteNotFoundException($request->path(), $request->method());
@@ -84,6 +105,23 @@ class HttpKernel
         return $response;
     }
 
+    /**
+     * Expose the container used for handler resolution.
+     *
+     * @return Container
+     */
+    public function container(): Container
+    {
+        return $this->container;
+    }
+
+    /**
+     * @param array<string, mixed> $route
+     * @param Request $request
+     * @return void
+     *
+     * @throws ValidationException
+     */
     private function runValidation(array $route, Request $request): void
     {
         $type = $route['validationType'] ?? 'body';
@@ -107,6 +145,12 @@ class HttpKernel
         $validator->validate();
     }
 
+    /**
+     * @param array<int, callable(Request): mixed|callable(Request, callable(Request): Response): mixed> $stack
+     * @param Request $request
+     * @param callable(Request): Response $core
+     * @return Response
+     */
     private function runMiddlewareStack(array $stack, Request $request, callable $core): Response
     {
         $next = array_reduce(
@@ -126,7 +170,13 @@ class HttpKernel
         return $next($request);
     }
 
-    private function callMiddleware(callable $middleware, Request $request, callable $next)
+    /**
+     * @param callable(Request): mixed|callable(Request, callable(Request): Response): mixed $middleware
+     * @param Request $request
+     * @param callable(Request): Response $next
+     * @return mixed
+     */
+    private function callMiddleware(callable $middleware, Request $request, callable $next): mixed
     {
         $ref = new \ReflectionFunction(\Closure::fromCallable($middleware));
         $paramCount = $ref->getNumberOfParameters();
@@ -136,6 +186,11 @@ class HttpKernel
         return $middleware($request, $next);
     }
 
+    /**
+     * @param mixed $handler
+     * @param Request $request
+     * @return Response
+     */
     private function dispatch($handler, Request $request): Response
     {
         $callable = $this->resolveHandler($handler);
@@ -158,21 +213,29 @@ class HttpKernel
         }
 
         return Response::error('Handler returned unsupported response type', 500, [
-            'type' => gettype($result)
+            'type' => gettype($result),
         ]);
     }
 
+    /**
+     * @param mixed $handler
+     * @return callable(mixed ...$args): mixed
+     */
     private function resolveHandler($handler): callable
     {
         if (is_string($handler) && strpos($handler, '@') !== false) {
             [$class, $method] = explode('@', $handler, 2);
             $instance = $this->container->get($class);
-            return [$instance, $method];
+            /** @var callable $callable */
+            $callable = [$instance, $method];
+            return \Closure::fromCallable($callable);
         }
 
         if (is_array($handler) && is_string($handler[0])) {
             $instance = $this->container->get($handler[0]);
-            return [$instance, $handler[1]];
+            /** @var callable $callable */
+            $callable = [$instance, $handler[1]];
+            return \Closure::fromCallable($callable);
         }
 
         if (!is_callable($handler)) {
@@ -182,14 +245,19 @@ class HttpKernel
         return $handler;
     }
 
-    private function callHandler(callable $handler, Request $request)
+    /**
+     * @param callable(mixed ...$args): mixed $handler
+     * @param Request $request
+     * @return mixed
+     */
+    private function callHandler(callable $handler, Request $request): mixed
     {
         $ref = new \ReflectionFunction(\Closure::fromCallable($handler));
         $params = [];
 
         foreach ($ref->getParameters() as $param) {
             $type = $param->getType();
-            if ($type !== null && !$type->isBuiltin()) {
+            if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
                 $typeName = $type->getName();
                 if ($typeName === Request::class) {
                     $params[] = $request;

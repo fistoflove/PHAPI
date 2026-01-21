@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Services;
 
 use PHAPI\Runtime\DriverCapabilities;
@@ -11,6 +13,14 @@ class RealtimeManager implements Realtime
     private ?SwooleDriver $swooleDriver;
     private FallbackRealtime $fallback;
 
+    /**
+     * Create a realtime manager.
+     *
+     * @param DriverCapabilities $capabilities
+     * @param SwooleDriver|null $swooleDriver
+     * @param FallbackRealtime $fallback
+     * @return void
+     */
     public function __construct(DriverCapabilities $capabilities, ?SwooleDriver $swooleDriver, FallbackRealtime $fallback)
     {
         $this->capabilities = $capabilities;
@@ -18,6 +28,13 @@ class RealtimeManager implements Realtime
         $this->fallback = $fallback;
     }
 
+    /**
+     * Broadcast a message to a channel.
+     *
+     * @param string $channel
+     * @param array<string, mixed> $message
+     * @return void
+     */
     public function broadcast(string $channel, array $message): void
     {
         if ($this->capabilities->supportsWebSockets() && $this->swooleDriver !== null) {

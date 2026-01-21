@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Runtime;
 
 use PHAPI\HTTP\Request;
@@ -10,11 +12,22 @@ class FpmDriver implements HttpRuntimeDriver
 {
     private Capabilities $capabilities;
 
+    /**
+     * Initialize the FPM driver with synchronous capabilities.
+     *
+     * @return void
+     */
     public function __construct()
     {
         $this->capabilities = new Capabilities(false, false, false, false);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @param HttpKernel $kernel
+     * @return void
+     */
     public function start(HttpKernel $kernel): void
     {
         $request = Request::fromGlobals();
@@ -22,6 +35,11 @@ class FpmDriver implements HttpRuntimeDriver
         $this->emit($response);
     }
 
+    /**
+     * {@inheritDoc}
+     *
+     * @return DriverCapabilities
+     */
     public function capabilities(): DriverCapabilities
     {
         return $this->capabilities;

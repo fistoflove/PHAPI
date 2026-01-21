@@ -22,9 +22,17 @@ class RouteBuilderTest extends TestCase
         $routerProp->setAccessible(true);
         $router = $routerProp->getValue($api);
         $routes = $router->getRoutes();
+        $registerRoute = null;
 
-        $this->assertCount(1, $routes);
-        $this->assertSame(['email' => 'required|email'], $routes[0]['validation']);
-        $this->assertSame('body', $routes[0]['validationType']);
+        foreach ($routes as $route) {
+            if ($route['path'] === '/register' && $route['method'] === 'POST') {
+                $registerRoute = $route;
+                break;
+            }
+        }
+
+        $this->assertNotNull($registerRoute);
+        $this->assertSame(['email' => 'required|email'], $registerRoute['validation']);
+        $this->assertSame('body', $registerRoute['validationType']);
     }
 }

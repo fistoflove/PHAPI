@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Logging;
 
 /**
@@ -11,12 +13,26 @@ class ChannelLogger
     private \PHAPI\Logging\Logger $logger;
     private string $channel;
 
+    /**
+     * Create a channel-specific logger.
+     *
+     * @param Logger $logger
+     * @param string $channel
+     * @return void
+     */
     public function __construct(Logger $logger, string $channel)
     {
         $this->logger = $logger;
         $this->channel = $channel;
     }
 
+    /**
+     * Log an info message to the channel.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     * @return void
+     */
     public function info(string $message, array $context = []): void
     {
         // Use logAccess format for access channel to get proper TSV columns
@@ -27,6 +43,13 @@ class ChannelLogger
         }
     }
 
+    /**
+     * Log a warning message to the channel.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     * @return void
+     */
     public function warning(string $message, array $context = []): void
     {
         // Use logAccess format for access channel to get proper TSV columns
@@ -37,6 +60,13 @@ class ChannelLogger
         }
     }
 
+    /**
+     * Log an error message to the channel.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     * @return void
+     */
     public function error(string $message, array $context = []): void
     {
         // Use logAccess format for access channel to get proper TSV columns
@@ -47,6 +77,13 @@ class ChannelLogger
         }
     }
 
+    /**
+     * Log a critical message to the channel.
+     *
+     * @param string $message
+     * @param array<string, mixed> $context
+     * @return void
+     */
     public function critical(string $message, array $context = []): void
     {
         // Use logAccess format for access channel to get proper TSV columns
@@ -58,4 +95,3 @@ class ChannelLogger
     }
 
 }
-

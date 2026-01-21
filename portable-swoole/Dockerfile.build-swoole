@@ -1,0 +1,39 @@
+# Dockerfile for building Swoole extensions
+# Usage: docker build --build-arg PHP_VERSION=8.3 --build-arg SWOOLE_VERSION=5.1.0 -f Dockerfile.build-swoole -t swoole-builder .
+
+ARG PHP_VERSION=8.3
+FROM php:${PHP_VERSION}-cli
+
+# Install build dependencies
+RUN echo "📦 Installing build dependencies..." && \
+    apt-get update && \
+    apt-get install -y \
+    build-essential \
+    git \
+    && rm -rf /var/lib/apt/lists/* && \
+    echo "✅ Build dependencies installed"
+
+WORKDIR /build
+
+# Clone and build Swoole
+ARG SWOOLE_VERSION=5.1.0
+RUN echo "📥 Cloning Swoole source code..." && \
+    git clone --depth 1 --branch v${SWOOLE_VERSION} https://github.com/swoole/swoole-src.git swoole-src && \
+    cd swoole-src && \
+    echo "📌 Using version v${SWOOLE_VERSION}" && \
+    echo "🔨 Running phpize..." && \
+    phpize && \
+    echo "⚙️  Running configure..." && \
+    ./configure && \
+    echo "🔨 Compiling Swoole (this may take 2-3 minutes)..." && \
+    make -j$(nproc) && \
+    echo "✅ Swoole extension compiled successfully!" && \
+    echo "📦 Copying extension..." && \
+    mkdir -p /output && \
+    cp modules/swoole.so /output/swoole.so && \
+    chmod 644 /output/swoole.so && \
+    echo "✅ Extension copied to /output/swoole.so" && \
+    file /output/swoole.so && \
+    ls -lh /output/swoole.so
+
+WORKDIR /output

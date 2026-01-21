@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Auth;
 
 use PHAPI\HTTP\Request;
@@ -7,15 +9,32 @@ use PHAPI\HTTP\RequestContext;
 
 class TokenGuard implements GuardInterface
 {
+    /**
+     * @var callable(string, Request): (array<string, mixed>|null)
+     */
     private $resolver;
+    /**
+     * @var array<string, mixed>|null
+     */
     private ?array $user = null;
     private ?int $lastRequestId = null;
 
+    /**
+     * Create a token guard.
+     *
+     * @param callable(string, Request): (array<string, mixed>|null) $resolver
+     * @return void
+     */
     public function __construct(callable $resolver)
     {
         $this->resolver = $resolver;
     }
 
+    /**
+     * Resolve the current user via token.
+     *
+     * @return array<string, mixed>|null
+     */
     public function user(): ?array
     {
         $request = RequestContext::get();
@@ -51,11 +70,21 @@ class TokenGuard implements GuardInterface
         return $this->user;
     }
 
+    /**
+     * Determine if a token resolves to a user.
+     *
+     * @return bool
+     */
     public function check(): bool
     {
         return $this->user() !== null;
     }
 
+    /**
+     * Get the resolved user id.
+     *
+     * @return string|null
+     */
     public function id(): ?string
     {
         $user = $this->user();
@@ -66,6 +95,11 @@ class TokenGuard implements GuardInterface
         return $id === null ? null : (string)$id;
     }
 
+    /**
+     * Get the bearer token from the current request.
+     *
+     * @return string|null
+     */
     public function token(): ?string
     {
         $request = RequestContext::get();

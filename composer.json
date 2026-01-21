@@ -31,6 +31,9 @@
         "amphp/http-client": "^5.3"
     },
     "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.60",
+        "phpstan/phpstan": "^1.10",
+        "phpstan/phpstan-strict-rules": "^1.5",
         "phpunit/phpunit": "^10.0"
     },
     "autoload": {
@@ -55,7 +58,11 @@
     "prefer-stable": true,
     "scripts": {
         "test": "phpunit --testdox",
-        "phpunit": "phpunit"
+        "test:integration": "phpunit --testdox --group integration",
+        "lint": "php-cs-fixer fix --dry-run --diff",
+        "lint:fix": "php-cs-fixer fix",
+        "phpunit": "phpunit",
+        "phpstan": "PHPSTAN_DISABLE_PARALLEL=1 php vendor/bin/phpstan analyse -c phpstan.neon --no-progress"
     },
     "config": {
         "sort-packages": true,

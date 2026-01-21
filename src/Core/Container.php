@@ -1,26 +1,54 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Core;
 
 use ReflectionClass;
-use ReflectionException;
 
 class Container
 {
+    /**
+     * @var array<string, mixed>
+     */
     private array $bindings = [];
+    /**
+     * @var array<string, mixed>
+     */
     private array $instances = [];
 
+    /**
+     * Bind a value or factory to an id.
+     *
+     * @param string $id
+     * @param mixed $value
+     * @return void
+     */
     public function set(string $id, $value): void
     {
         $this->bindings[$id] = $value;
         unset($this->instances[$id]);
     }
 
+    /**
+     * Determine if a binding or instance exists.
+     *
+     * @param string $id
+     * @return bool
+     */
     public function has(string $id): bool
     {
         return array_key_exists($id, $this->instances) || array_key_exists($id, $this->bindings);
     }
 
+    /**
+     * Resolve a binding or autowire a class by name.
+     *
+     * @param string $id
+     * @return mixed
+     *
+     * @throws \RuntimeException When the service cannot be resolved.
+     */
     public function get(string $id)
     {
         if (array_key_exists($id, $this->instances)) {
@@ -43,13 +71,13 @@ class Container
         return $instance;
     }
 
-    private function autowire(string $className)
+    /**
+     * @param class-string $className
+     * @return object
+     */
+    private function autowire(string $className): object
     {
-        try {
-            $reflection = new ReflectionClass($className);
-        } catch (ReflectionException $e) {
-            throw new \RuntimeException("Cannot reflect '$className': " . $e->getMessage());
-        }
+        $reflection = new ReflectionClass($className);
 
         $constructor = $reflection->getConstructor();
         if ($constructor === null) {
@@ -59,7 +87,7 @@ class Container
         $params = [];
         foreach ($constructor->getParameters() as $param) {
             $type = $param->getType();
-            if ($type === null || $type->isBuiltin()) {
+            if (!$type instanceof \ReflectionNamedType || $type->isBuiltin()) {
                 if ($param->isDefaultValueAvailable()) {
                     $params[] = $param->getDefaultValue();
                     continue;

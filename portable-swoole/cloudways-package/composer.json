@@ -1,0 +1,23 @@
+{
+    "name": "phapi/phapi-cloudways",
+    "description": "PHAPI Deployment Package for Cloudways",
+    "type": "project",
+    "require": {
+        "php": "^8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "PHAPI\\": "src/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "optimize-autoloader": true,
+        "platform-check": false
+    },
+    "scripts": {
+        "post-install-cmd": [
+            "@php -r \"echo '✓ Composer installed successfully\\n';\""
+        ]
+    }
+}

@@ -1,0 +1,46 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * PHAPI Runner - Wrapper that ensures Swoole is loaded
+ * 
+ * Usage:
+ *   ./bin/phapi-run app.php
+ *   php bin/phapi-run app.php
+ */
+
+if (php_sapi_name() !== 'cli') {
+    exit('This script can only be run from command line.');
+}
+
+require __DIR__ . '/../vendor/autoload.php';
+
+use PHAPI\Tools\ExtensionLoader;
+
+// Try to load Swoole extension if not available
+if (!extension_loaded('swoole')) {
+    if (ExtensionLoader::loadSwoole()) {
+        // Extension loaded successfully via custom ini
+        // Continue execution
+    } elseif (ExtensionLoader::needsCustomIni()) {
+        // Custom ini exists, run with -c flag
+        $script = $argv[1] ?? 'app.php';
+        $iniPath = ExtensionLoader::getCommand($script);
+        passthru($iniPath);
+        exit;
+    } else {
+        echo "Error: Swoole extension is not loaded and cannot be auto-loaded.\n";
+        echo "Please install Swoole extension manually.\n";
+        exit(1);
+    }
+}
+
+// Swoole is loaded, run the script
+$script = $argv[1] ?? 'app.php';
+if (!file_exists($script)) {
+    echo "Error: Script '$script' not found.\n";
+    exit(1);
+}
+
+require $script;
+

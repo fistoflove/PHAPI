@@ -1,9 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Services;
 
 class SwooleHttpClient implements HttpClient
 {
+    /**
+     * Fetch and decode JSON using Swoole coroutine HTTP client.
+     *
+     * @param string $url
+     * @return array<string, mixed>
+     */
     public function getJson(string $url): array
     {
         if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {

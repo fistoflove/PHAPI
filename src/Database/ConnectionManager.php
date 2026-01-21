@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Database;
 
 use PDO;
@@ -12,15 +14,21 @@ use PDOException;
 class ConnectionManager
 {
     private static ?PDO $connection = null;
+    /**
+     * @var array<int, PDO>
+     */
     private static array $workerConnections = [];
     private static ?string $dbPath = null;
+    /**
+     * @var array<string, mixed>
+     */
     private static array $config = [];
 
     /**
      * Configure database connection
      *
      * @param string $dbPath Path to SQLite database file
-     * @param array $options Connection options
+     * @param array<string, mixed> $options Connection options
      * @return void
      */
     public static function configure(string $dbPath, array $options = []): void
@@ -48,7 +56,7 @@ class ConnectionManager
 
         // Use worker ID for connection pooling in Swoole
         // Fall back to static connection if Swoole not available
-        if (!function_exists('Swoole\Coroutine::getCid')) {
+        if (!extension_loaded('swoole')) {
             if (self::$connection === null) {
                 self::$connection = self::createConnection();
             }
@@ -97,37 +105,47 @@ class ConnectionManager
      */
     private static function createConnection(): PDO
     {
+        if (self::$dbPath === null || self::$dbPath === '') {
+            throw new \RuntimeException('Database path is not configured.');
+        }
+
+        $dbPath = self::$dbPath;
+
         // Create directory if needed
-        $dbDir = dirname(self::$dbPath);
+        $dbDir = dirname($dbPath);
         if (!is_dir($dbDir)) {
             @mkdir($dbDir, 0755, true);
         }
 
         // Create database file if it doesn't exist
-        if (!file_exists(self::$dbPath)) {
-            touch(self::$dbPath);
-            chmod(self::$dbPath, 0644);
+        if (!file_exists($dbPath)) {
+            touch($dbPath);
+            chmod($dbPath, 0644);
         }
 
         try {
-            $dsn = 'sqlite:' . self::$dbPath;
+            $dsn = 'sqlite:' . $dbPath;
             $options = [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_TIMEOUT => self::$config['timeout'] / 1000,
             ];
 
+            $readonly = (bool)(self::$config['readonly'] ?? false);
+            $walMode = (bool)(self::$config['wal_mode'] ?? false);
+            $busyTimeout = (int)(self::$config['busy_timeout'] ?? 0);
+
             // Read-only mode
-            if (self::$config['readonly']) {
+            if ($readonly) {
                 $dsn .= '?mode=ro';
             }
 
             $connection = new PDO($dsn, null, null, $options);
 
             // Configure WAL mode for better concurrency
-            if (self::$config['wal_mode'] && !self::$config['readonly']) {
+            if ($walMode && !$readonly) {
                 $connection->exec('PRAGMA journal_mode=WAL;');
-                $connection->exec('PRAGMA busy_timeout=' . self::$config['busy_timeout'] . ';');
+                $connection->exec('PRAGMA busy_timeout=' . $busyTimeout . ';');
                 $connection->exec('PRAGMA synchronous=NORMAL;');
             }
 

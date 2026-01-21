@@ -1,12 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Server;
 
 use PHAPI\Logging\Logger;
 
 /**
  * Performance Monitor
- * 
+ *
  * Processes health check logs and calculates performance metrics
  */
 class PerformanceMonitor
@@ -14,6 +16,12 @@ class PerformanceMonitor
     private Logger $logger;
     private bool $enabled = false;
 
+    /**
+     * Create a performance monitor.
+     *
+     * @param Logger $logger
+     * @return void
+     */
     public function __construct(Logger $logger)
     {
         $this->logger = $logger;
@@ -21,10 +29,16 @@ class PerformanceMonitor
 
     /**
      * Enable performance monitoring
-     * 
+     *
      * Adds performance channel and schedules monitoring job
-     * 
+     *
      * @param bool $enabled Enable monitoring (default: true)
+     * @return void
+     */
+    /**
+     * Enable performance monitoring.
+     *
+     * @param bool $enabled
      * @return void
      */
     public function enable(bool $enabled = true): void
@@ -36,10 +50,15 @@ class PerformanceMonitor
 
     /**
      * Process performance metrics from health check logs
-     * 
+     *
      * Reads system.log, extracts health check entries from last 5 minutes,
      * calculates average response time, and logs to performance channel.
-     * 
+     *
+     * @return void
+     */
+    /**
+     * Process metrics from recent health checks.
+     *
      * @return void
      */
     public function processMetrics(): void
@@ -49,12 +68,15 @@ class PerformanceMonitor
         }
 
         $systemLogFile = $this->logger->getChannelFile(Logger::CHANNEL_SYSTEM);
-        if (!$systemLogFile || !file_exists($systemLogFile)) {
+        if ($systemLogFile === null || $systemLogFile === '' || !file_exists($systemLogFile)) {
             return;
         }
 
         // Read system log and find health check entries from last 5 minutes
         $lines = file($systemLogFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            return;
+        }
         $healthChecks = [];
         $cutoffTime = time() - 300; // Last 5 minutes
 
@@ -90,13 +112,13 @@ class PerformanceMonitor
                     $healthChecks[] = [
                         'timestamp' => $parts[0],
                         'response_time' => $responseTime,
-                        'status_code' => $statusCode
+                        'status_code' => $statusCode,
                     ];
                 }
             }
         }
 
-        if (empty($healthChecks)) {
+        if ($healthChecks === []) {
             return;
         }
 
@@ -108,13 +130,13 @@ class PerformanceMonitor
         $count = count($healthChecks);
 
         // Log performance metrics (summary only - individual entries are in system.log)
-        $this->logger->performance()->info("Performance summary", [
+        $this->logger->performance()->info('Performance summary', [
             'period_minutes' => 5,
             'health_checks_count' => $count,
             'avg_response_time_ms' => round($avgResponseTime, 2),
             'min_response_time_ms' => round($minResponseTime, 2),
             'max_response_time_ms' => round($maxResponseTime, 2),
-            'status_code' => 200 // All health checks should return 200
+            'status_code' => 200, // All health checks should return 200
         ]);
 
         // Clean up processed health check logs from system.log
@@ -123,9 +145,16 @@ class PerformanceMonitor
 
     /**
      * Clean health check logs older than cutoff time
-     * 
+     *
      * @param string $logPath Path to system.log
      * @param int $cutoffTime Timestamp cutoff
+     * @return void
+     */
+    /**
+     * Trim health check logs older than the cutoff time.
+     *
+     * @param string $logPath
+     * @param int $cutoffTime
      * @return void
      */
     public function cleanHealthCheckLogs(string $logPath, int $cutoffTime): void
@@ -135,6 +164,9 @@ class PerformanceMonitor
         }
 
         $lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            return;
+        }
         $filteredLines = [];
 
         foreach ($lines as $line) {
@@ -163,7 +195,12 @@ class PerformanceMonitor
 
     /**
      * Check if performance monitoring is enabled
-     * 
+     *
+     * @return bool
+     */
+    /**
+     * Determine if monitoring is enabled.
+     *
      * @return bool
      */
     public function isEnabled(): bool

@@ -1,12 +1,23 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\HTTP;
 
 class RequestContext
 {
+    /**
+     * @var array<int, Request>
+     */
     private static array $byCoroutine = [];
     private static ?Request $current = null;
 
+    /**
+     * Store the current request in the context.
+     *
+     * @param Request $request
+     * @return void
+     */
     public static function set(Request $request): void
     {
         $cid = self::coroutineId();
@@ -18,6 +29,11 @@ class RequestContext
         self::$byCoroutine[$cid] = $request;
     }
 
+    /**
+     * Get the current request from the context.
+     *
+     * @return Request|null
+     */
     public static function get(): ?Request
     {
         $cid = self::coroutineId();
@@ -28,6 +44,11 @@ class RequestContext
         return self::$byCoroutine[$cid] ?? null;
     }
 
+    /**
+     * Clear the current request from the context.
+     *
+     * @return void
+     */
     public static function clear(): void
     {
         $cid = self::coroutineId();

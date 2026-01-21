@@ -10,7 +10,7 @@ class RouterTest extends TestCase
     public function testNamedRouteUrlGeneration(): void
     {
         $router = new Router();
-        $router->addRoute('GET', '/users/{id}', fn() => null, [], null, 'body', 'users.show');
+        $router->addRoute('GET', '/users/{id}', fn () => null, [], null, 'body', 'users.show');
 
         $url = $router->urlFor('users.show', ['id' => 10], ['tab' => 'profile']);
         $this->assertSame('/users/10?tab=profile', $url);
@@ -19,7 +19,7 @@ class RouterTest extends TestCase
     public function testOptionalParams(): void
     {
         $router = new Router();
-        $router->addRoute('GET', '/search/{query?}', fn() => null);
+        $router->addRoute('GET', '/search/{query?}', fn () => null);
 
         $match = $router->match('GET', '/search', null);
         $this->assertNotNull($match['route']);
@@ -31,7 +31,7 @@ class RouterTest extends TestCase
     public function testMethodNotAllowed(): void
     {
         $router = new Router();
-        $router->addRoute('GET', '/users/{id}', fn() => null);
+        $router->addRoute('GET', '/users/{id}', fn () => null);
 
         $match = $router->match('POST', '/users/1', null);
         $this->assertNull($match['route']);

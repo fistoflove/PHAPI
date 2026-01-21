@@ -1,9 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Services;
 
 class BlockingHttpClient implements HttpClient
 {
+    /**
+     * Fetch and decode JSON using blocking HTTP.
+     *
+     * @param string $url
+     * @return array<string, mixed>
+     */
     public function getJson(string $url): array
     {
         $context = stream_context_create([

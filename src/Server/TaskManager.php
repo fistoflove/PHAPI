@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Server;
 
 use PHAPI\Logging\Logger;
@@ -10,10 +12,20 @@ use Swoole\Http\Server;
  */
 class TaskManager
 {
+    /**
+     * @var array<string, callable(mixed, Logger): void>
+     */
     private array $tasks = [];
     private Logger $logger;
     private bool $debug;
 
+    /**
+     * Create a task manager.
+     *
+     * @param Logger $logger
+     * @param bool $debug
+     * @return void
+     */
     public function __construct(Logger $logger, bool $debug = false)
     {
         $this->logger = $logger;
@@ -24,7 +36,8 @@ class TaskManager
      * Register a task handler
      *
      * @param string $name Task name
-     * @param callable $handler Task handler receives: ($data, $logger)
+     * @param callable(mixed, Logger): void $handler Task handler receives: ($data, $logger)
+     * @return void
      */
     public function register(string $name, callable $handler): void
     {
@@ -35,6 +48,7 @@ class TaskManager
      * Setup task event handlers on Swoole server
      *
      * @param Server $server Swoole server instance
+     * @return void
      */
     public function setupHandlers(Server $server): void
     {
@@ -43,9 +57,9 @@ class TaskManager
         });
 
         $server->on('finish', function (Server $serv, int $taskId, string $result) {
-            $this->logger->debug()->info("Task finished", [
+            $this->logger->debug()->info('Task finished', [
                 'task_id' => $taskId,
-                'result' => $result
+                'result' => $result,
             ]);
         });
     }
@@ -63,9 +77,9 @@ class TaskManager
         $data = $payload['data'] ?? null;
 
         if (!isset($this->tasks[$name])) {
-            $this->logger->task()->warning("Unknown task", [
+            $this->logger->task()->warning('Unknown task', [
                 'task_id' => $taskId,
-                'name' => $name
+                'name' => $name,
             ]);
             $server->finish("unknown:$name");
             return;
@@ -74,18 +88,18 @@ class TaskManager
         try {
             ($this->tasks[$name])($data, $this->logger);
             $server->finish("done:$name");
-            $this->logger->task()->info("Task completed", [
+            $this->logger->task()->info('Task completed', [
                 'task_id' => $taskId,
-                'name' => $name
+                'name' => $name,
             ]);
         } catch (\Throwable $e) {
-            $this->logger->task()->error("Task failed", [
+            $this->logger->task()->error('Task failed', [
                 'task_id' => $taskId,
                 'name' => $name,
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
-                'trace' => $this->debug ? $e->getTraceAsString() : null
+                'trace' => $this->debug ? $e->getTraceAsString() : null,
             ]);
             $server->finish("error:$name:" . $e->getMessage());
         }
@@ -101,11 +115,10 @@ class TaskManager
      */
     public function dispatch(Server $server, string $name, mixed $data): bool
     {
-        $this->logger->debug()->info("Dispatching task", [
+        $this->logger->debug()->info('Dispatching task', [
             'name' => $name,
-            'has_data' => !is_null($data)
+            'has_data' => !is_null($data),
         ]);
         return $server->task(['name' => $name, 'data' => $data]);
     }
 }
-

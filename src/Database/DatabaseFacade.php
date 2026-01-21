@@ -1,26 +1,24 @@
 <?php
 
-namespace PHAPI\Database;
+declare(strict_types=1);
 
-use PHAPI\Database\ConnectionManager;
-use PHAPI\Database\Options;
-use PHAPI\Database\Schema;
+namespace PHAPI\Database;
 
 /**
  * Database Facade
- * 
+ *
  * Provides a simple facade for database operations (options, transients)
  */
 class DatabaseFacade
 {
     /**
      * Configure database connection
-     * 
+     *
      * Sets up SQLite database with automatic schema initialization.
      * Database is optional - features work without it.
-     * 
+     *
      * @param string $dbPath Path to SQLite database file
-     * @param array $options Connection options:
+     * @param array<string, mixed> $options Connection options:
      *   - readonly: bool (default: false)
      *   - wal_mode: bool (default: true)
      *   - timeout: int Milliseconds (default: 5000)
@@ -46,9 +44,9 @@ class DatabaseFacade
 
     /**
      * Get database connection
-     * 
+     *
      * Returns PDO instance if database is configured, null otherwise.
-     * 
+     *
      * @return \PDO|null
      */
     public static function getConnection(): ?\PDO
@@ -62,7 +60,7 @@ class DatabaseFacade
 
     /**
      * Check if database is configured
-     * 
+     *
      * @return bool
      */
     public static function isConfigured(): bool
@@ -72,10 +70,10 @@ class DatabaseFacade
 
     /**
      * Get option value (WordPress-style)
-     * 
+     *
      * Simple key-value storage for arbitrary data.
      * Returns default value if option doesn't exist.
-     * 
+     *
      * @param string $key Option key
      * @param mixed $default Default value if option doesn't exist
      * @return mixed
@@ -91,13 +89,13 @@ class DatabaseFacade
 
     /**
      * Set option value (WordPress-style)
-     * 
+     *
      * Stores arbitrary data with a key.
      * Supports autoload and expiration options.
-     * 
+     *
      * @param string $key Option key
      * @param mixed $value Option value (any type)
-     * @param array $options Additional options:
+     * @param array<string, mixed> $options Additional options:
      *   - autoload: bool Load into memory cache (default: false)
      *   - expires: int|string Seconds until expiration or date string
      * @return bool Success
@@ -113,7 +111,7 @@ class DatabaseFacade
 
     /**
      * Check if option exists
-     * 
+     *
      * @param string $key Option key
      * @return bool
      */
@@ -128,7 +126,7 @@ class DatabaseFacade
 
     /**
      * Delete option
-     * 
+     *
      * @param string $key Option key
      * @return bool Success
      */
@@ -143,7 +141,7 @@ class DatabaseFacade
 
     /**
      * Delete all options with given prefix
-     * 
+     *
      * @param string $prefix Key prefix
      * @return int Number of deleted options
      */
@@ -158,9 +156,9 @@ class DatabaseFacade
 
     /**
      * Get all options with given prefix
-     * 
+     *
      * @param string $prefix Key prefix
-     * @return array Associative array of key => value
+     * @return array<string, mixed> Associative array of key => value
      */
     public static function getOptionGroup(string $prefix): array
     {
@@ -173,9 +171,9 @@ class DatabaseFacade
 
     /**
      * Set transient (temporary option with expiration)
-     * 
+     *
      * Transients are temporary key-value pairs that automatically expire.
-     * 
+     *
      * @param string $key Transient key
      * @param mixed $value Transient value
      * @param int $expires Seconds until expiration (default: 3600 = 1 hour)
@@ -192,10 +190,10 @@ class DatabaseFacade
 
     /**
      * Get transient value
-     * 
+     *
      * Returns the transient value if it exists and hasn't expired.
      * Returns default value if transient doesn't exist or has expired.
-     * 
+     *
      * @param string $key Transient key
      * @param mixed $default Default value if transient doesn't exist or expired
      * @return mixed
@@ -211,7 +209,7 @@ class DatabaseFacade
 
     /**
      * Delete transient
-     * 
+     *
      * @param string $key Transient key
      * @return bool Success
      */

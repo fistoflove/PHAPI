@@ -1,15 +1,34 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Services;
 
+/**
+ * @phpstan-type JobConfig array{interval: int, handler: callable(mixed ...$args): mixed, log_enabled: bool, log_file: string|null, lock_mode: string}
+ * @phpstan-type JobRecord array{job: string, status: string, started_at: string|null, duration_ms: float|null, output: string, result: mixed, error?: string}
+ * @phpstan-type JobLock array{handle: resource, path: string}
+ */
 class JobsManager
 {
+    /**
+     * @var array<string, JobConfig>
+     */
     private array $jobs = [];
     private string $logDir;
     private int $logLimit;
     private int $rotateBytes;
     private int $rotateKeep;
 
+    /**
+     * Create a jobs manager with log rotation settings.
+     *
+     * @param string $logDir
+     * @param int $logLimit
+     * @param int $rotateBytes
+     * @param int $rotateKeep
+     * @return void
+     */
     public function __construct(string $logDir, int $logLimit = 200, int $rotateBytes = 1048576, int $rotateKeep = 5)
     {
         $this->logDir = $logDir;
@@ -18,6 +37,15 @@ class JobsManager
         $this->rotateKeep = $rotateKeep;
     }
 
+    /**
+     * Register a recurring job.
+     *
+     * @param string $name
+     * @param int $intervalSeconds
+     * @param callable(mixed ...$args): mixed $handler
+     * @param array{log_enabled?: bool, log_file?: string|null, lock_mode?: string} $options
+     * @return void
+     */
     public function register(string $name, int $intervalSeconds, callable $handler, array $options = []): void
     {
         if ($intervalSeconds < 1) {
@@ -33,16 +61,32 @@ class JobsManager
         ];
     }
 
+    /**
+     * Get job names.
+     *
+     * @return array<int, string>
+     */
     public function list(): array
     {
         return array_keys($this->jobs);
     }
 
+    /**
+     * Get all registered jobs.
+     *
+     * @return array<string, JobConfig>
+     */
     public function jobs(): array
     {
         return $this->jobs;
     }
 
+    /**
+     * Run due jobs and return results.
+     *
+     * @param callable(callable(mixed ...$args): mixed, string): mixed $executor
+     * @return array<int, JobRecord>
+     */
     public function runDue(callable $executor): array
     {
         $now = time();
@@ -61,6 +105,13 @@ class JobsManager
         return $results;
     }
 
+    /**
+     * Run a scheduled job by name.
+     *
+     * @param string $name
+     * @param callable(callable(mixed ...$args): mixed, string): mixed $executor
+     * @return JobRecord|null
+     */
     public function runScheduled(string $name, callable $executor): ?array
     {
         if (!isset($this->jobs[$name])) {
@@ -71,6 +122,12 @@ class JobsManager
         return $this->runJob($name, $this->jobs[$name], $executor, $now);
     }
 
+    /**
+     * Get job logs, optionally filtered by job name.
+     *
+     * @param string|null $name
+     * @return array<int, JobRecord>
+     */
     public function logs(?string $name = null): array
     {
         if ($name !== null) {
@@ -92,6 +149,15 @@ class JobsManager
         return $entries;
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @param callable(callable(mixed ...$args): mixed, string): mixed $executor
+     * @param int $now
+     * @return JobRecord
+     * @phpstan-return JobRecord
+     */
     private function runJob(string $name, array $job, callable $executor, int $now): array
     {
         $record = [
@@ -132,6 +198,15 @@ class JobsManager
         return $record;
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @param JobRecord $record
+     * @phpstan-param JobRecord $record
+     * @param int $now
+     * @return void
+     */
     private function recordRun(string $name, array $job, array $record, int $now): void
     {
         if ($job['log_enabled']) {
@@ -146,7 +221,7 @@ class JobsManager
         $this->writeState($name, $now);
     }
 
-    private function normalizeResult($value)
+    private function normalizeResult(mixed $value): mixed
     {
         if (is_scalar($value) || $value === null) {
             return $value;
@@ -159,6 +234,14 @@ class JobsManager
         return (string)$value;
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @param JobRecord $record
+     * @phpstan-param JobRecord $record
+     * @return void
+     */
     private function appendLog(string $name, array $job, array $record): void
     {
         $path = $this->logPathFor($name, $job);
@@ -173,8 +256,8 @@ class JobsManager
             $record['started_at'],
             $record['status'],
             (string)$record['duration_ms'],
-            $this->sanitizeField($record['output'] ?? ''),
-            $this->sanitizeField($record['result'] ?? ''),
+            $this->sanitizeField($record['output']),
+            $this->sanitizeField($record['result']),
             $this->sanitizeField($record['error'] ?? ''),
         ]);
 
@@ -219,6 +302,12 @@ class JobsManager
         file_put_contents($path, implode("\n", $lines) . "\n");
     }
 
+    /**
+     * @param string $path
+     * @param string $jobName
+     * @return array<int, JobRecord>
+     * @phpstan-return array<int, JobRecord>
+     */
     private function readLogLines(string $path, string $jobName): array
     {
         if (!file_exists($path)) {
@@ -236,10 +325,11 @@ class JobsManager
                 continue;
             }
             $parts = explode("\t", $line);
+            $status = $parts[1] ?? '';
             $entries[] = [
                 'job' => $jobName,
                 'started_at' => $parts[0] ?? null,
-                'status' => $parts[1] ?? null,
+                'status' => $status,
                 'duration_ms' => isset($parts[2]) ? (float)$parts[2] : null,
                 'output' => $parts[3] ?? '',
                 'result' => $parts[4] ?? '',
@@ -250,6 +340,12 @@ class JobsManager
         return $entries;
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @return int|null
+     */
     private function getLastRunTimestamp(string $name, array $job): ?int
     {
         if ($job['log_enabled']) {
@@ -259,6 +355,12 @@ class JobsManager
         return $this->readState($name);
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @return int|null
+     */
     private function getLastLogTimestamp(string $name, array $job): ?int
     {
         $path = $this->logPathFor($name, $job);
@@ -267,7 +369,7 @@ class JobsManager
         }
 
         $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-        if ($lines === false || empty($lines)) {
+        if ($lines === false || $lines === []) {
             return null;
         }
 
@@ -310,6 +412,13 @@ class JobsManager
         file_put_contents($path, (string)$timestamp . "\n");
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @return JobLock|null
+     * @phpstan-return JobLock|null
+     */
     private function acquireLock(string $name, array $job): ?array
     {
         $path = $this->lockPathFor($name);
@@ -323,7 +432,7 @@ class JobsManager
             return null;
         }
 
-        $mode = $job['lock_mode'] ?? 'skip';
+        $mode = $job['lock_mode'];
         $flags = $mode === 'block' ? LOCK_EX : (LOCK_EX | LOCK_NB);
 
         if (!flock($handle, $flags)) {
@@ -334,15 +443,26 @@ class JobsManager
         return ['handle' => $handle, 'path' => $path];
     }
 
+    /**
+     * @param JobLock $lock
+     * @phpstan-param JobLock $lock
+     * @return void
+     */
     private function releaseLock(array $lock): void
     {
-        $handle = $lock['handle'] ?? null;
+        $handle = $lock['handle'];
         if (is_resource($handle)) {
             flock($handle, LOCK_UN);
             fclose($handle);
         }
     }
 
+    /**
+     * @param string $name
+     * @param JobConfig $job
+     * @phpstan-param JobConfig $job
+     * @return string
+     */
     private function logPathFor(string $name, array $job): string
     {
         $custom = $job['log_file'];
@@ -369,7 +489,7 @@ class JobsManager
         return rtrim($this->logDir, '/') . '/' . $safeName . '.lock';
     }
 
-    private function sanitizeField($value): string
+    private function sanitizeField(mixed $value): string
     {
         if (is_array($value) || is_object($value)) {
             $value = json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);

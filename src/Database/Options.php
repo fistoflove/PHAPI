@@ -1,18 +1,21 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\Database;
 
-use PHAPI\Database\ConnectionManager;
-use PHAPI\Database\Schema;
 use PDOException;
 
 /**
  * Options Facade - WordPress-style key-value storage
- * 
+ *
  * Provides simple interface for storing and retrieving arbitrary data
  */
 class Options
 {
+    /**
+     * @var array<string, mixed>|null
+     */
     private static ?array $cache = null;
     private static bool $cacheLoaded = false;
 
@@ -48,7 +51,7 @@ class Options
         try {
             $db = ConnectionManager::getConnection();
             $stmt = $db->query("SELECT key, value FROM options WHERE autoload = 1 AND (expires_at IS NULL OR expires_at > datetime('now'))");
-            $options = $stmt->fetchAll();
+            $options = $stmt === false ? [] : $stmt->fetchAll();
 
             self::$cache = [];
             foreach ($options as $option) {
@@ -81,27 +84,28 @@ class Options
 
         try {
             $db = ConnectionManager::getConnection();
-            $stmt = $db->prepare("SELECT value, expires_at FROM options WHERE key = ?");
+            $stmt = $db->prepare('SELECT value, expires_at FROM options WHERE key = ?');
             $stmt->execute([$key]);
             $option = $stmt->fetch();
 
-            if (!$option) {
+            if ($option === false || $option === null) {
                 return $default;
             }
 
             // Check expiration
-            if ($option['expires_at'] && $option['expires_at'] < date('Y-m-d H:i:s')) {
+            $expiresAt = $option['expires_at'] ?? null;
+            if ($expiresAt !== null && $expiresAt !== '' && $expiresAt < date('Y-m-d H:i:s')) {
                 self::delete($key);
                 return $default;
             }
 
             $value = json_decode($option['value'], true);
-            
+
             // Cache autoload options
             if (self::$cacheLoaded) {
-                $autoloadStmt = $db->prepare("SELECT autoload FROM options WHERE key = ? AND autoload = 1");
+                $autoloadStmt = $db->prepare('SELECT autoload FROM options WHERE key = ? AND autoload = 1');
                 $autoloadStmt->execute([$key]);
-                if ($autoloadStmt->fetch()) {
+                if ($autoloadStmt->fetch() !== false) {
                     self::$cache[$key] = $value;
                 }
             }
@@ -117,14 +121,14 @@ class Options
      *
      * @param string $key Option key
      * @param mixed $value Option value (any type)
-     * @param array $options Additional options (autoload, expires)
+     * @param array<string, mixed> $options Additional options (autoload, expires)
      * @return bool
      */
     public static function set(string $key, $value, array $options = []): bool
     {
         self::ensureInitialized();
 
-        $autoload = $options['autoload'] ?? false;
+        $autoload = (bool)($options['autoload'] ?? false);
         $expires = $options['expires'] ?? null;
 
         $expiresAt = null;
@@ -139,7 +143,7 @@ class Options
         try {
             $db = ConnectionManager::getConnection();
             $jsonValue = json_encode($value);
-            
+
             $stmt = $db->prepare("
                 INSERT INTO options (key, value, autoload, expires_at, updated_at)
                 VALUES (?, ?, ?, ?, datetime('now'))
@@ -154,7 +158,7 @@ class Options
                 $key,
                 $jsonValue,
                 $autoload ? 1 : 0,
-                $expiresAt
+                $expiresAt,
             ]);
 
             // Update cache if autoload
@@ -209,7 +213,7 @@ class Options
 
         try {
             $db = ConnectionManager::getConnection();
-            $stmt = $db->prepare("DELETE FROM options WHERE key = ?");
+            $stmt = $db->prepare('DELETE FROM options WHERE key = ?');
             $result = $stmt->execute([$key]);
 
             // Remove from cache
@@ -235,14 +239,14 @@ class Options
 
         try {
             $db = ConnectionManager::getConnection();
-            $stmt = $db->prepare("DELETE FROM options WHERE key LIKE ?");
+            $stmt = $db->prepare('DELETE FROM options WHERE key LIKE ?');
             $stmt->execute([$prefix . '%']);
-            
+
             $count = $stmt->rowCount();
 
             // Clear cache entries with prefix
             if (self::$cacheLoaded) {
-                foreach (array_keys(self::$cache) as $key) {
+                foreach (array_keys(self::$cache ?? []) as $key) {
                     if (strpos($key, $prefix) === 0) {
                         unset(self::$cache[$key]);
                     }
@@ -259,7 +263,7 @@ class Options
      * Get all options with given prefix
      *
      * @param string $prefix Key prefix
-     * @return array Associative array of key => value
+     * @return array<string, mixed> Associative array of key => value
      */
     public static function getGroup(string $prefix): array
     {
@@ -285,14 +289,14 @@ class Options
     /**
      * Get multiple options at once
      *
-     * @param array $keys Array of keys
-     * @return array Associative array of key => value
+     * @param array<int, string> $keys Array of keys
+     * @return array<string, mixed> Associative array of key => value
      */
     public static function getMany(array $keys): array
     {
         self::ensureInitialized();
 
-        if (empty($keys)) {
+        if ($keys === []) {
             return [];
         }
 
@@ -309,7 +313,7 @@ class Options
                 }
             }
 
-            if (empty($missingKeys)) {
+            if ($missingKeys === []) {
                 return $result;
             }
         } else {
@@ -345,15 +349,16 @@ class Options
         try {
             $db = ConnectionManager::getConnection();
             $stmt = $db->exec("DELETE FROM options WHERE expires_at IS NOT NULL AND expires_at < datetime('now')");
-            
+            $deleted = $stmt === false ? 0 : $stmt;
+
             // Clear cache if expired options were deleted
-            if (self::$cacheLoaded && $stmt > 0) {
+            if (self::$cacheLoaded && $deleted > 0) {
                 // Reload cache to remove expired entries
                 self::$cacheLoaded = false;
                 self::loadAutoload();
             }
 
-            return $stmt;
+            return $deleted;
         } catch (PDOException $e) {
             return 0;
         }
@@ -372,7 +377,7 @@ class Options
 
     /**
      * Set transient (temporary option with expiration)
-     * 
+     *
      * Convenience method for setting options that always expire.
      * Transients are always temporary and never autoload.
      *
@@ -385,13 +390,13 @@ class Options
     {
         return self::set($key, $value, [
             'expires' => $expires,
-            'autoload' => false
+            'autoload' => false,
         ]);
     }
 
     /**
      * Get transient value
-     * 
+     *
      * Convenience method for getting transient options.
      * Returns default if transient doesn't exist or has expired.
      *
@@ -406,7 +411,7 @@ class Options
 
     /**
      * Delete transient
-     * 
+     *
      * Convenience method for deleting transient options.
      *
      * @param string $key Transient key

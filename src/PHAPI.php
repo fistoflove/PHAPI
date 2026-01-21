@@ -1,18 +1,24 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI;
 
-use PHAPI\Core\Container;
 use PHAPI\Auth\AuthManager;
 use PHAPI\Auth\AuthMiddleware;
-use PHAPI\Auth\SessionGuard;
-use PHAPI\Auth\TokenGuard;
-use PHAPI\HTTP\RouteBuilder;
+use PHAPI\Core\AppBootstrapper;
+use PHAPI\Core\AuthConfigurator;
+use PHAPI\Core\ConfigLoader;
+use PHAPI\Core\Container;
+use PHAPI\Core\DefaultEndpoints;
+use PHAPI\Core\HttpKernelFactory;
+use PHAPI\Core\JobsScheduler;
+use PHAPI\Core\RuntimeManager;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
+use PHAPI\HTTP\RouteBuilder;
 use PHAPI\Runtime\DriverCapabilities;
-use PHAPI\Runtime\HttpRuntimeDriver;
-use PHAPI\Runtime\RuntimeSelector;
+use PHAPI\Runtime\PortableSwooleLoader;
 use PHAPI\Runtime\SwooleDriver;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
@@ -21,11 +27,9 @@ use PHAPI\Server\Router;
 use PHAPI\Services\AmpHttpClient;
 use PHAPI\Services\AmpTaskRunner;
 use PHAPI\Services\BlockingHttpClient;
-use PHAPI\Services\FallbackRealtime;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\Realtime;
-use PHAPI\Services\RealtimeManager;
 use PHAPI\Services\SequentialTaskRunner;
 use PHAPI\Services\SwooleHttpClient;
 use PHAPI\Services\SwooleTaskRunner;
@@ -34,124 +38,282 @@ use PHAPI\Services\TaskRunner;
 final class PHAPI
 {
     private static ?PHAPI $lastInstance = null;
+    /**
+     * @var array<string, mixed>
+     */
     private array $config;
     private Router $router;
     private MiddlewareManager $middleware;
     private ErrorHandler $errorHandler;
     private Container $container;
     private HttpKernel $kernel;
-    private HttpRuntimeDriver $driver;
-    private DriverCapabilities $capabilities;
+    private RuntimeManager $runtimeManager;
+    private HttpKernelFactory $kernelFactory;
     private JobsManager $jobs;
     private AuthManager $auth;
+    private AppBootstrapper $bootstrapper;
+    private ConfigLoader $configLoader;
+    private AuthConfigurator $authConfigurator;
+    private JobsScheduler $jobsScheduler;
+    private DefaultEndpoints $defaultEndpoints;
+    /**
+     * @var callable(string, array<string, mixed>): void|null
+     */
     private $realtimeFallback = null;
+    /**
+     * @var callable(\Swoole\WebSocket\Server, mixed, SwooleDriver): void|null
+     */
     private $webSocketHandler = null;
 
+    /**
+     * Create a new PHAPI instance with configuration overrides.
+     *
+     * @param array<string, mixed> $config
+     * @return void
+     */
     public function __construct(array $config = [])
     {
         self::$lastInstance = $this;
-        $this->config = array_merge([
-            'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
-            'debug' => (bool)(getenv('APP_DEBUG') ?: false),
-            'host' => '0.0.0.0',
-            'port' => 9501,
-            'enable_websockets' => false,
-        ], $config);
+        $this->configLoader = new ConfigLoader();
+        $this->config = $this->configLoader->load($config);
 
-        $this->router = new Router();
-        $this->middleware = new MiddlewareManager();
-        $this->errorHandler = new ErrorHandler($this->config['debug']);
-        $this->container = new Container();
-        $this->kernel = new HttpKernel(
-            $this->router,
-            $this->middleware,
-            $this->errorHandler,
-            $this->container,
-            $this->config['access_logger'] ?? null
-        );
+        $this->kernelFactory = new HttpKernelFactory();
+        $kernelComponents = $this->kernelFactory->build($this->config);
+        $this->router = $kernelComponents['router'];
+        $this->middleware = $kernelComponents['middleware'];
+        $this->errorHandler = $kernelComponents['errorHandler'];
+        $this->kernel = $kernelComponents['kernel'];
+        $this->container = $this->kernel->container();
         $logDir = $this->config['jobs_log_dir'] ?? (getcwd() . '/var/jobs');
         $logLimit = (int)($this->config['jobs_log_limit'] ?? 200);
         $rotateBytes = (int)($this->config['jobs_log_rotate_bytes'] ?? 1048576);
         $rotateKeep = (int)($this->config['jobs_log_rotate_keep'] ?? 5);
         $this->jobs = new JobsManager($logDir, $logLimit, $rotateBytes, $rotateKeep);
-        $this->auth = $this->configureAuth();
+        $this->authConfigurator = new AuthConfigurator();
+        $this->auth = $this->authConfigurator->configure($this->config);
+        $this->bootstrapper = new AppBootstrapper();
+        $this->jobsScheduler = new JobsScheduler();
+        $this->defaultEndpoints = new DefaultEndpoints();
 
-        $this->driver = RuntimeSelector::select($this->config);
-        $this->capabilities = $this->driver->capabilities();
+        $this->runtimeManager = new RuntimeManager($this->config);
 
-        $this->registerCoreServices();
-        $this->registerSafetyMiddleware();
+        $this->bootstrapper->registerCoreServices(
+            $this,
+            $this->container,
+            $this->middleware,
+            $this->jobs,
+            $this->auth,
+            $this->resolveTaskRunner(),
+            $this->resolveHttpClient(),
+            $this->runtimeManager->capabilities(),
+            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
+            $this->config['debug'],
+            $this->realtimeFallback,
+            $this->webSocketHandler
+        );
+        $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
+        $this->defaultEndpoints->register($this, $this->jobs, $this->config);
     }
 
+    /**
+     * Enable or disable debug mode.
+     *
+     * @param bool $debug
+     * @return self
+     */
     public function setDebug(bool $debug): self
     {
         $this->config['debug'] = $debug;
         $this->errorHandler->setDebug($debug);
-        $this->registerCoreServices();
+        $this->bootstrapper->registerCoreServices(
+            $this,
+            $this->container,
+            $this->middleware,
+            $this->jobs,
+            $this->auth,
+            $this->resolveTaskRunner(),
+            $this->resolveHttpClient(),
+            $this->runtimeManager->capabilities(),
+            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
+            $this->config['debug'],
+            $this->realtimeFallback,
+            $this->webSocketHandler
+        );
         return $this;
     }
 
+    /**
+     * Set the runtime driver name.
+     *
+     * @param string $runtime
+     * @return self
+     */
     public function setRuntime(string $runtime): self
     {
         $this->config['runtime'] = $runtime;
-        $this->driver = RuntimeSelector::select($this->config);
-        $this->capabilities = $this->driver->capabilities();
-        $this->registerCoreServices();
+        $this->runtimeManager->reconfigure($this->config);
+        $this->bootstrapper->registerCoreServices(
+            $this,
+            $this->container,
+            $this->middleware,
+            $this->jobs,
+            $this->auth,
+            $this->resolveTaskRunner(),
+            $this->resolveHttpClient(),
+            $this->runtimeManager->capabilities(),
+            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
+            $this->config['debug'],
+            $this->realtimeFallback,
+            $this->webSocketHandler
+        );
         return $this;
     }
 
+    /**
+     * Set a fallback callback for realtime operations in unsupported runtimes.
+     *
+     * @param callable(string, array<string, mixed>): void $fallback
+     * @return self
+     */
     public function setRealtimeFallback(callable $fallback): self
     {
         $this->realtimeFallback = $fallback;
-        $this->registerCoreServices();
+        $this->bootstrapper->registerCoreServices(
+            $this,
+            $this->container,
+            $this->middleware,
+            $this->jobs,
+            $this->auth,
+            $this->resolveTaskRunner(),
+            $this->resolveHttpClient(),
+            $this->runtimeManager->capabilities(),
+            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
+            $this->config['debug'],
+            $this->realtimeFallback,
+            $this->webSocketHandler
+        );
         return $this;
     }
 
+    /**
+     * Register a WebSocket message handler for Swoole.
+     *
+     * @param callable(\Swoole\WebSocket\Server, mixed, SwooleDriver): void $handler
+     * @return self
+     */
     public function setWebSocketHandler(callable $handler): self
     {
         $this->webSocketHandler = $handler;
-        if ($this->driver instanceof SwooleDriver) {
-            $this->driver->setWebSocketHandler($handler);
+        $driver = $this->runtimeManager->driver();
+        if ($driver instanceof SwooleDriver) {
+            $driver->setWebSocketHandler($handler);
         }
         return $this;
     }
 
+    /**
+     * Return the active runtime capabilities.
+     *
+     * @return DriverCapabilities
+     */
     public function capabilities(): DriverCapabilities
     {
-        return $this->capabilities;
+        return $this->runtimeManager->capabilities();
     }
 
+    /**
+     * Return the effective runtime name.
+     *
+     * @return string
+     */
+    public function runtimeName(): string
+    {
+        $runtime = $this->config['runtime'] ?? 'fpm';
+        if ($runtime === 'auto') {
+            $capabilities = $this->runtimeManager->capabilities();
+            return $capabilities->supportsPersistentState()
+                ? 'swoole'
+                : ($capabilities->supportsAsyncIo() ? 'fpm_amphp' : 'fpm');
+        }
+
+        if ($runtime === 'portable_swoole') {
+            if (PortableSwooleLoader::wasLoaded() || getenv('PHAPI_PORTABLE_SWOOLE_USED') === '1') {
+                return 'portable_swoole';
+            }
+            return 'swoole';
+        }
+
+        return $runtime;
+    }
+
+    /**
+     * Access the DI container.
+     *
+     * @return Container
+     */
     public function container(): Container
     {
         return $this->container;
     }
 
+    /**
+     * Start the configured runtime server.
+     *
+     * @return void
+     */
     public function run(): void
     {
-        if (getenv('PHAPI_RUN_MODE') === 'jobs') {
+        $runMode = getenv('PHAPI_RUN_MODE');
+        if ($runMode === 'jobs') {
             return;
         }
-        if ($this->driver instanceof SwooleDriver) {
-            $this->registerSwooleJobs();
-        }
-        $this->driver->start($this->kernel);
+        $driver = $this->runtimeManager->driver();
+        $this->jobsScheduler->registerSwooleJobs(
+            $this->jobs,
+            $driver instanceof SwooleDriver ? $driver : null,
+            function (callable $handler): array {
+                return $this->executeJobHandler($handler);
+            }
+        );
+        $driver->start($this->kernel);
     }
 
+    /**
+     * Get the last constructed PHAPI instance.
+     *
+     * @return self|null
+     */
     public static function lastInstance(): ?self
     {
         return self::$lastInstance;
     }
 
+    /**
+     * Alias for lastInstance().
+     *
+     * @return self|null
+     */
     public static function app(): ?self
     {
         return self::$lastInstance;
     }
 
+    /**
+     * Get the current request from the request context.
+     *
+     * @return Request|null
+     */
     public static function request(): ?Request
     {
         return RequestContext::get();
     }
 
+    /**
+     * Load app bootstrap files from the given base directory.
+     *
+     * @param string|null $baseDir
+     * @return void
+     */
     public function loadApp(?string $baseDir = null): void
     {
         $baseDir = $baseDir ?? getcwd();
@@ -170,6 +332,13 @@ final class PHAPI
         }
     }
 
+    /**
+     * Group routes under a prefix.
+     *
+     * @param string $prefix
+     * @param callable(self): void $define
+     * @return void
+     */
     public function group(string $prefix, callable $define): void
     {
         $this->router->pushPrefix($prefix);
@@ -177,36 +346,91 @@ final class PHAPI
         $this->router->popPrefix();
     }
 
+    /**
+     * Register a GET route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function get(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('GET', $path, $handler);
     }
 
+    /**
+     * Register a POST route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function post(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('POST', $path, $handler);
     }
 
+    /**
+     * Register a PUT route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function put(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('PUT', $path, $handler);
     }
 
+    /**
+     * Register a PATCH route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function patch(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('PATCH', $path, $handler);
     }
 
+    /**
+     * Register a DELETE route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function delete(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('DELETE', $path, $handler);
     }
 
+    /**
+     * Register an OPTIONS route.
+     *
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     public function options(string $path, $handler): RouteBuilder
     {
         return $this->registerBuilder('OPTIONS', $path, $handler);
     }
 
+    /**
+     * Register a route directly with the router.
+     *
+     * @param string $method
+     * @param string $path
+     * @param mixed $handler
+     * @param array<int, array<string, mixed>> $middleware
+     * @param array<string, string>|null $validationRules
+     * @param string $validationType
+     * @param string|null $name
+     * @param mixed $host
+     * @return int Route index.
+     */
     public function registerRoute(
         string $method,
         string $path,
@@ -220,11 +444,26 @@ final class PHAPI
         return $this->router->addRoute($method, $path, $handler, $middleware, $validationRules, $validationType, $name, $host);
     }
 
+    /**
+     * Update a registered route by index.
+     *
+     * @param int $index
+     * @param array<string, mixed> $route
+     * @return void
+     */
     public function updateRoute(int $index, array $route): void
     {
         $this->router->updateRoute($index, $route);
     }
 
+    /**
+     * Register global middleware or return a route builder for named middleware.
+     *
+     * @param mixed $handler
+     * @return self|RouteBuilder
+     *
+     * @throws \InvalidArgumentException
+     */
     public function middleware($handler)
     {
         if (is_string($handler)) {
@@ -239,18 +478,41 @@ final class PHAPI
         throw new \InvalidArgumentException('middleware() expects a callable (global middleware) or string (named middleware)');
     }
 
+    /**
+     * Register after-middleware to run after the handler.
+     *
+     * @param callable(Request, \PHAPI\HTTP\Response): (\PHAPI\HTTP\Response|void) $handler
+     * @return self
+     */
     public function afterMiddleware(callable $handler): self
     {
         $this->middleware->addAfterMiddleware($handler);
         return $this;
     }
 
+    /**
+     * Register a named middleware handler.
+     *
+     * @param string $name
+     * @param callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response, array<string, mixed>=): mixed $handler
+     * @return self
+     */
     public function addMiddleware(string $name, callable $handler): self
     {
         $this->middleware->registerNamed($name, $handler);
         return $this;
     }
 
+    /**
+     * Enable CORS handling using a global middleware.
+     *
+     * @param mixed $origins
+     * @param array<int, string> $methods
+     * @param array<int, string> $headers
+     * @param bool $credentials
+     * @param int $maxAge
+     * @return self
+     */
     public function enableCORS(
         $origins = '*',
         array $methods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -283,17 +545,36 @@ final class PHAPI
         return $this;
     }
 
+    /**
+     * Get the task runner service.
+     *
+     * @return TaskRunner
+     */
     public function tasks(): TaskRunner
     {
         return $this->container->get(TaskRunner::class);
     }
 
+    /**
+     * Schedule a recurring job.
+     *
+     * @param string $name
+     * @param int $intervalSeconds
+     * @param callable(mixed ...$args): mixed $handler
+     * @param array<string, mixed> $options
+     * @return self
+     */
     public function schedule(string $name, int $intervalSeconds, callable $handler, array $options = []): self
     {
         $this->jobs->register($name, $intervalSeconds, $handler, $options);
         return $this;
     }
 
+    /**
+     * Run any due jobs and return their results.
+     *
+     * @return array<int, array<string, mixed>>
+     */
     public function runJobs(): array
     {
         return $this->jobs->runDue(function (callable $handler, string $name) {
@@ -301,31 +582,68 @@ final class PHAPI
         });
     }
 
+    /**
+     * Return job logs, optionally filtered by job name.
+     *
+     * @param string|null $name
+     * @return array<int, array<string, mixed>>
+     */
     public function jobLogs(?string $name = null): array
     {
         return $this->jobs->logs($name);
     }
 
+    /**
+     * Access the auth manager.
+     *
+     * @return AuthManager
+     */
     public function auth(): AuthManager
     {
         return $this->auth;
     }
 
+    /**
+     * Return auth-required middleware for the given guard.
+     *
+     * @param string|null $guard
+     * @return callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): \PHAPI\HTTP\Response
+     */
     public function requireAuth(?string $guard = null): callable
     {
         return AuthMiddleware::require($this->auth, $guard);
     }
 
+    /**
+     * Return role-required middleware for the given guard.
+     *
+     * @param string|array<int, string> $roles
+     * @param string|null $guard
+     * @return callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): \PHAPI\HTTP\Response
+     */
     public function requireRole($roles, ?string $guard = null): callable
     {
         return AuthMiddleware::requireRole($this->auth, $roles, $guard);
     }
 
+    /**
+     * Return middleware requiring all roles.
+     *
+     * @param array<int, string> $roles
+     * @param string|null $guard
+     * @return callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): \PHAPI\HTTP\Response
+     */
     public function requireAllRoles(array $roles, ?string $guard = null): callable
     {
         return AuthMiddleware::requireAllRoles($this->auth, $roles, $guard);
     }
 
+    /**
+     * Enable default security headers with optional overrides.
+     *
+     * @param array<string, string> $headers
+     * @return self
+     */
     public function enableSecurityHeaders(array $headers = []): self
     {
         $defaults = [
@@ -348,21 +666,45 @@ final class PHAPI
         return $this;
     }
 
+    /**
+     * Get the HTTP client service.
+     *
+     * @return HttpClient
+     */
     public function http(): HttpClient
     {
         return $this->container->get(HttpClient::class);
     }
 
+    /**
+     * Generate a URL for a named route.
+     *
+     * @param string $name
+     * @param array<string, string> $params
+     * @param array<string, string> $query
+     * @return string
+     */
     public function url(string $name, array $params = [], array $query = []): string
     {
         return $this->router->urlFor($name, $params, $query);
     }
 
+    /**
+     * Get the realtime service.
+     *
+     * @return Realtime
+     */
     public function realtime(): Realtime
     {
         return $this->container->get(Realtime::class);
     }
 
+    /**
+     * @param string $method
+     * @param string $path
+     * @param mixed $handler
+     * @return RouteBuilder
+     */
     private function registerBuilder(string $method, string $path, $handler): RouteBuilder
     {
         $builder = new RouteBuilder($this, $method, $path, $handler);
@@ -372,38 +714,78 @@ final class PHAPI
 
     private function createRouteBuilderWithMiddleware(string $middlewareName): RouteBuilder
     {
-        return new class($this, $middlewareName) extends RouteBuilder {
-            private PHAPI $apiInstance;
+        return new class ($this, $middlewareName) extends RouteBuilder {
             private string $preMiddleware;
 
+            /**
+             * Create a middleware-prefixed route builder.
+             *
+             * @param PHAPI $api
+             * @param string $middleware
+             * @return void
+             */
             public function __construct(PHAPI $api, string $middleware)
             {
-                $this->apiInstance = $api;
                 $this->preMiddleware = $middleware;
                 parent::__construct($api, '', '', function () {
                 });
             }
 
+            /**
+             * Register a GET route with the predefined middleware.
+             *
+             * @param string $path
+             * @param mixed $handler
+             * @return RouteBuilder
+             */
             public function get(string $path, $handler): RouteBuilder
             {
                 return parent::get($path, $handler)->middleware($this->preMiddleware);
             }
 
+            /**
+             * Register a POST route with the predefined middleware.
+             *
+             * @param string $path
+             * @param mixed $handler
+             * @return RouteBuilder
+             */
             public function post(string $path, $handler): RouteBuilder
             {
                 return parent::post($path, $handler)->middleware($this->preMiddleware);
             }
 
+            /**
+             * Register a PUT route with the predefined middleware.
+             *
+             * @param string $path
+             * @param mixed $handler
+             * @return RouteBuilder
+             */
             public function put(string $path, $handler): RouteBuilder
             {
                 return parent::put($path, $handler)->middleware($this->preMiddleware);
             }
 
+            /**
+             * Register a PATCH route with the predefined middleware.
+             *
+             * @param string $path
+             * @param mixed $handler
+             * @return RouteBuilder
+             */
             public function patch(string $path, $handler): RouteBuilder
             {
                 return parent::patch($path, $handler)->middleware($this->preMiddleware);
             }
 
+            /**
+             * Register a DELETE route with the predefined middleware.
+             *
+             * @param string $path
+             * @param mixed $handler
+             * @return RouteBuilder
+             */
             public function delete(string $path, $handler): RouteBuilder
             {
                 return parent::delete($path, $handler)->middleware($this->preMiddleware);
@@ -411,10 +793,16 @@ final class PHAPI
         };
     }
 
+    /**
+     * @param array<int, string>|string $origins
+     * @param string|null $requestOrigin
+     * @param bool $credentials
+     * @return string
+     */
     private function resolveOrigin($origins, ?string $requestOrigin, bool $credentials): string
     {
         if ($origins === '*') {
-            return $credentials && $requestOrigin ? $requestOrigin : '*';
+            return ($credentials && $requestOrigin !== null && $requestOrigin !== '') ? $requestOrigin : '*';
         }
 
         if (is_array($origins)) {
@@ -424,86 +812,13 @@ final class PHAPI
             return $origins[0] ?? '*';
         }
 
-        return (string)$origins;
+        return $origins;
     }
 
-    private function registerCoreServices(): void
-    {
-        $this->container->set(self::class, $this);
-        $this->container->set(TaskRunner::class, $this->resolveTaskRunner());
-        $this->container->set(HttpClient::class, $this->resolveHttpClient());
-        $this->container->set(AuthManager::class, $this->auth);
-        $this->container->set('auth', $this->auth);
-
-        $this->middleware->registerNamed('auth', AuthMiddleware::require($this->auth));
-        $this->middleware->registerNamed('role', function ($request, $next, array $args = []) {
-            if (empty($args)) {
-                return $next($request);
-            }
-            return AuthMiddleware::requireRole($this->auth, $args)($request, $next);
-        });
-
-        $this->middleware->registerNamed('role_all', function ($request, $next, array $args = []) {
-            if (empty($args)) {
-                return $next($request);
-            }
-            return AuthMiddleware::requireAllRoles($this->auth, $args)($request, $next);
-        });
-
-        $fallback = new FallbackRealtime($this->config['debug'], $this->realtimeFallback);
-        $this->container->set(Realtime::class, new RealtimeManager(
-            $this->capabilities,
-            $this->driver instanceof SwooleDriver ? $this->driver : null,
-            $fallback
-        ));
-
-        if ($this->driver instanceof SwooleDriver && $this->webSocketHandler !== null) {
-            $this->driver->setWebSocketHandler($this->webSocketHandler);
-        }
-    }
-
-    private function registerSafetyMiddleware(): void
-    {
-        $maxBody = $this->config['max_body_bytes'] ?? null;
-        if ($maxBody !== null) {
-            $limit = (int)$maxBody;
-            $this->middleware->addGlobalMiddleware(function ($request, $next) use ($limit) {
-                $length = $request->contentLength();
-                if ($length !== null && $length > $limit) {
-                    return \PHAPI\HTTP\Response::error('Payload too large', 413, [
-                        'max_bytes' => $limit,
-                        'received_bytes' => $length,
-                    ]);
-                }
-                return $next($request);
-            });
-        }
-    }
-
-    private function registerSwooleJobs(): void
-    {
-        $jobs = $this->jobs->jobs();
-        if (empty($jobs)) {
-            return;
-        }
-
-        $self = $this;
-        $this->driver->onWorkerStart(function ($server, int $workerId) use ($jobs, $self) {
-            if ($workerId !== 0) {
-                return;
-            }
-
-            foreach ($jobs as $name => $job) {
-                $intervalMs = (int)$job['interval'] * 1000;
-                \Swoole\Timer::tick($intervalMs, function () use ($job, $self, $name) {
-                    $self->jobs->runScheduled($name, function (callable $handler, string $jobName) use ($self) {
-                        return $self->executeJobHandler($handler);
-                    });
-                });
-            }
-        });
-    }
-
+    /**
+     * @param callable(mixed ...$args): mixed $handler
+     * @return array{result: mixed, output: string}
+     */
     private function executeJobHandler(callable $handler): array
     {
         $ref = new \ReflectionFunction(\Closure::fromCallable($handler));
@@ -511,7 +826,7 @@ final class PHAPI
 
         foreach ($ref->getParameters() as $param) {
             $type = $param->getType();
-            if ($type !== null && !$type->isBuiltin()) {
+            if ($type instanceof \ReflectionNamedType && !$type->isBuiltin()) {
                 $typeName = $type->getName();
                 if ($typeName === Container::class) {
                     $params[] = $this->container;
@@ -543,11 +858,12 @@ final class PHAPI
 
     private function resolveTaskRunner(): TaskRunner
     {
-        if ($this->driver instanceof SwooleDriver) {
+        $driver = $this->runtimeManager->driver();
+        if ($driver instanceof SwooleDriver) {
             return new SwooleTaskRunner();
         }
 
-        if ($this->capabilities->supportsAsyncIo()) {
+        if ($this->runtimeManager->capabilities()->supportsAsyncIo()) {
             return new AmpTaskRunner();
         }
 
@@ -556,32 +872,16 @@ final class PHAPI
 
     private function resolveHttpClient(): HttpClient
     {
-        if ($this->driver instanceof SwooleDriver) {
+        $driver = $this->runtimeManager->driver();
+        if ($driver instanceof SwooleDriver) {
             return new SwooleHttpClient();
         }
 
-        if ($this->capabilities->supportsAsyncIo()) {
+        if ($this->runtimeManager->capabilities()->supportsAsyncIo()) {
             return new AmpHttpClient();
         }
 
         return new BlockingHttpClient();
     }
 
-    private function configureAuth(): AuthManager
-    {
-        $authConfig = $this->config['auth'] ?? [];
-        $default = $authConfig['default'] ?? 'token';
-        $manager = new AuthManager($default);
-
-        $tokenResolver = $authConfig['token_resolver'] ?? function () {
-            return null;
-        };
-        $sessionKey = $authConfig['session_key'] ?? 'user';
-        $sessionAllowInSwoole = (bool)($authConfig['session_allow_in_swoole'] ?? false);
-
-        $manager->addGuard('token', new TokenGuard($tokenResolver));
-        $manager->addGuard('session', new SessionGuard($sessionKey, $sessionAllowInSwoole));
-
-        return $manager;
-    }
 }

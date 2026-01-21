@@ -1,0 +1,194 @@
+#!/usr/bin/env php
+<?php
+
+/**
+ * PHAPI Extension Installer (Standalone - no Composer required)
+ * 
+ * Installs bundled Swoole extension by creating custom php.ini
+ * 
+ * Usage:
+ *   php bin/phapi-install
+ */
+
+if (php_sapi_name() !== 'cli') {
+    exit('This script can only be run from command line.' . PHP_EOL);
+}
+
+// Standalone extension installer - no Composer needed
+class ExtensionInstallerStandalone
+{
+    public static function detectPlatform(): string
+    {
+        $os = strtolower(PHP_OS);
+        $arch = strtolower(php_uname('m'));
+        
+        if (strpos($os, 'linux') !== false) {
+            $os = 'linux';
+        }
+        
+        if ($arch === 'x86_64' || $arch === 'amd64') {
+            $arch = 'x86_64';
+        } elseif ($arch === 'aarch64' || $arch === 'arm64') {
+            $arch = 'arm64';
+        }
+        
+        return "{$os}-{$arch}";
+    }
+
+    public static function findBundledExtension(): ?string
+    {
+        $scriptDir = __DIR__;
+        $extDir = $scriptDir . '/../bin/extensions';
+        $phpVersion = PHP_MAJOR_VERSION . '.' . PHP_MINOR_VERSION;
+        $platform = self::detectPlatform();
+        
+        $paths = [
+            "{$extDir}/php{$phpVersion}/{$platform}/swoole.so",
+            "{$extDir}/php" . PHP_MAJOR_VERSION . "/{$platform}/swoole.so",
+            "{$extDir}/{$platform}/swoole.so",
+            "{$extDir}/swoole.so",
+        ];
+
+        foreach ($paths as $path) {
+            $realPath = realpath($path);
+            if ($realPath !== false && file_exists($realPath)) {
+                return $realPath;
+            }
+        }
+
+        return null;
+    }
+
+    public static function checkStatus(): array
+    {
+        $status = [
+            'loaded' => extension_loaded('swoole'),
+            'version' => null,
+            'php_version' => PHP_VERSION,
+            'php_major' => PHP_MAJOR_VERSION,
+            'php_minor' => PHP_MINOR_VERSION,
+            'platform' => self::detectPlatform(),
+            'extension_dir' => ini_get('extension_dir'),
+        ];
+
+        if ($status['loaded']) {
+            $status['version'] = phpversion('swoole');
+        }
+
+        $bundledPath = self::findBundledExtension();
+        $status['bundled_extension_available'] = ($bundledPath !== null);
+        $status['bundled_extension_path'] = $bundledPath;
+
+        return $status;
+    }
+
+    public static function install(): bool
+    {
+        $bundledPath = self::findBundledExtension();
+        if ($bundledPath === null) {
+            return false;
+        }
+
+        // Use absolute paths
+        $extensionDir = dirname($bundledPath);
+        $extensionFile = basename($bundledPath);
+        $currentDir = getcwd();
+        $iniPath = $currentDir . '/phapi.ini';
+
+        // Verify extension file exists
+        if (!file_exists($bundledPath)) {
+            return false;
+        }
+
+        $iniContent = <<<INI
+; PHAPI Custom php.ini
+; Auto-generated for loading bundled Swoole extension
+; PHP Version: {PHP_VERSION}
+; Platform: {PLATFORM}
+; Generated: {DATE}
+
+; Only load Swoole extension using absolute path
+; Don't change extension_dir to avoid loading other extensions from this directory
+extension = "{EXT_FULL_PATH}"
+
+INI;
+
+        $iniContent = str_replace([
+            '{PHP_VERSION}',
+            '{PLATFORM}',
+            '{EXT_FULL_PATH}',
+            '{DATE}'
+        ], [
+            PHP_VERSION,
+            self::detectPlatform(),
+            $bundledPath, // Use absolute path to extension
+            date('Y-m-d H:i:s')
+        ], $iniContent);
+
+        return file_put_contents($iniPath, $iniContent) !== false;
+    }
+}
+
+// Run installer
+echo "\n";
+echo "================================================\n";
+echo "  PHAPI Extension Installer\n";
+echo "================================================\n\n";
+
+$status = ExtensionInstallerStandalone::checkStatus();
+
+if ($status['loaded']) {
+    echo "✓ Swoole is already installed!\n";
+    echo "  Version: {$status['version']}\n";
+    echo "  PHP Version: {$status['php_version']}\n\n";
+    exit(0);
+}
+
+echo "PHP Version: {$status['php_version']}\n";
+echo "Platform: {$status['platform']}\n";
+echo "Extension Directory: {$status['extension_dir']}\n\n";
+
+if (!$status['bundled_extension_available']) {
+    echo "✗ No bundled extension found for your platform.\n\n";
+    echo "Searched in: " . __DIR__ . "/../bin/extensions/\n";
+    echo "Looking for: php{$status['php_major']}.{$status['php_minor']}/{$status['platform']}/swoole.so\n\n";
+    echo "Available options:\n";
+    echo "  1. Contact hosting provider to install Swoole\n";
+    echo "  2. Compile Swoole extension manually\n";
+    echo "  3. Use Docker if available\n\n";
+    exit(1);
+}
+
+echo "✓ Bundled extension found!\n";
+echo "  Path: {$status['bundled_extension_path']}\n";
+echo "  Size: " . number_format(filesize($status['bundled_extension_path']) / 1024 / 1024, 2) . " MB\n\n";
+
+echo "Installing extension...\n";
+
+if (ExtensionInstallerStandalone::install()) {
+    $iniPath = getcwd() . '/phapi.ini';
+    echo "✓ Installation successful!\n\n";
+    echo "Created: {$iniPath}\n\n";
+    
+    // Verify the ini file
+    echo "Verifying configuration...\n";
+    $output = [];
+    $returnVar = 0;
+    exec("php -c {$iniPath} -m 2>&1 | grep swoole", $output, $returnVar);
+    
+    if ($returnVar === 0 && !empty($output)) {
+        echo "✓ Extension loads successfully!\n\n";
+    } else {
+        echo "⚠ Extension may not load. Try: php -c {$iniPath} -m\n\n";
+    }
+    
+    echo "To run your application:\n";
+    echo "  php -c phapi.ini app.php\n\n";
+    echo "Or use the wrapper:\n";
+    echo "  php bin/phapi-run app.php\n\n";
+} else {
+    echo "✗ Installation failed!\n";
+    echo "  Cannot create phapi.ini file.\n";
+    echo "  Check write permissions in: " . getcwd() . "\n\n";
+    exit(1);
+}

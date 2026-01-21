@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace PHAPI\HTTP;
 
 use PHAPI\Exceptions\ValidationException;
@@ -9,10 +11,23 @@ use PHAPI\Exceptions\ValidationException;
  */
 class Validator
 {
+    /**
+     * @var array<string, mixed>
+     */
     private array $data;
+    /**
+     * @var array<string, string>
+     */
     private array $errors = [];
     private string $dataType; // 'body', 'query', 'param'
 
+    /**
+     * Create a validator for the given data.
+     *
+     * @param array<string, mixed> $data
+     * @param string $dataType
+     * @return void
+     */
     public function __construct(array $data, string $dataType = 'body')
     {
         $this->data = $data;
@@ -21,13 +36,17 @@ class Validator
 
     /**
      * Validate field - returns self for chaining
+     *
+     * @param string $field
+     * @param string $rules
+     * @return self
      */
     public function field(string $field, string $rules): self
     {
         $rules = explode('|', $rules);
         $value = $this->data[$field] ?? null;
-        $isRequired = in_array('required', $rules);
-        $isOptional = in_array('optional', $rules);
+        $isRequired = in_array('required', $rules, true);
+        $isOptional = in_array('optional', $rules, true);
 
         // Check if field is required
         if ($isRequired && ($value === null || $value === '')) {
@@ -65,6 +84,9 @@ class Validator
 
     /**
      * Validate multiple fields at once
+     *
+     * @param array<string, string> $rules
+     * @return self
      */
     public function rules(array $rules): self
     {
@@ -76,14 +98,18 @@ class Validator
 
     /**
      * Check if validation passed
+     *
+     * @return bool
      */
     public function isValid(): bool
     {
-        return empty($this->errors);
+        return $this->errors === [];
     }
 
     /**
      * Get validation errors
+     *
+     * @return array<string, string>
      */
     public function errors(): array
     {
@@ -91,7 +117,21 @@ class Validator
     }
 
     /**
+     * Get the validator data type.
+     *
+     * @return string
+     */
+    public function dataType(): string
+    {
+        return $this->dataType;
+    }
+
+    /**
      * Validate and throw exception if invalid
+     *
+     * @return void
+     *
+     * @throws ValidationException
      */
     public function validate(): void
     {
@@ -103,7 +143,7 @@ class Validator
     /**
      * Apply a single validation rule
      */
-    private function validateRule(string $field, $value, string $ruleName, ?string $ruleValue): bool
+    private function validateRule(string $field, mixed $value, string $ruleName, ?string $ruleValue): bool
     {
         switch ($ruleName) {
             case 'string':
@@ -131,7 +171,7 @@ class Validator
 
             case 'boolean':
             case 'bool':
-                if (!is_bool($value) && !in_array($value, ['0', '1', 'true', 'false', 'on', 'off'])) {
+                if (!is_bool($value) && !in_array($value, ['0', '1', 'true', 'false', 'on', 'off'], true)) {
                     $this->errors[$field] = "Field '{$field}' must be a boolean";
                     return false;
                 }
@@ -145,14 +185,14 @@ class Validator
                 break;
 
             case 'email':
-                if (!filter_var($value, FILTER_VALIDATE_EMAIL)) {
+                if (filter_var($value, FILTER_VALIDATE_EMAIL) === false) {
                     $this->errors[$field] = "Field '{$field}' must be a valid email address";
                     return false;
                 }
                 break;
 
             case 'url':
-                if (!filter_var($value, FILTER_VALIDATE_URL)) {
+                if (filter_var($value, FILTER_VALIDATE_URL) === false) {
                     $this->errors[$field] = "Field '{$field}' must be a valid URL";
                     return false;
                 }
@@ -211,14 +251,14 @@ class Validator
 
             case 'in':
                 $allowed = explode(',', $ruleValue ?? '');
-                if (!in_array($value, $allowed)) {
+                if (!in_array($value, $allowed, true)) {
                     $this->errors[$field] = "Field '{$field}' must be one of: " . implode(', ', $allowed);
                     return false;
                 }
                 break;
 
             case 'regex':
-                if (!preg_match($ruleValue ?? '', (string)$value)) {
+                if (preg_match($ruleValue ?? '', (string)$value) !== 1) {
                     $this->errors[$field] = "Field '{$field}' format is invalid";
                     return false;
                 }
@@ -228,4 +268,3 @@ class Validator
         return true;
     }
 }
-

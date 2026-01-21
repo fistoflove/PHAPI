@@ -10,7 +10,7 @@ class AuthManagerTest extends TestCase
 {
     public function testRolesHelpers(): void
     {
-        $guard = new class implements GuardInterface {
+        $guard = new class () implements GuardInterface {
             public function user(): ?array
             {
                 return ['id' => 1, 'roles' => ['admin', 'editor']];
