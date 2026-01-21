@@ -9,6 +9,7 @@ $api = new PHAPI([
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
+    'default_endpoints' => false,
     'max_body_bytes' => 1024 * 1024,
     'access_logger' => function ($request, $response, array $meta) {
         $line = sprintf(
