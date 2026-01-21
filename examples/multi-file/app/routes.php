@@ -2,6 +2,7 @@
 
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
+use PHAPI\Examples\MultiFile\Controllers\UserController;
 
 $api->get('/', function(): Response {
     return Response::json(['message' => 'Multi-file app running']);
@@ -16,12 +17,38 @@ $api->get('/users/{id}', function(): Response {
     ]);
 })->name('users.show');
 
+$api->get('/users', [UserController::class, 'index']);
+
 $api->get('/search/{query?}', function(): Response {
     $request = PHAPI::request();
     return Response::json([
         'query' => $request?->param('query'),
     ]);
 })->name('search');
+
+$api->get('/runtime', function(): Response {
+    $app = PHAPI::app();
+    $runtime = $app?->runtime();
+
+    return Response::json([
+        'runtime' => $runtime?->name(),
+        'async_io' => $runtime?->capabilities()->supportsAsyncIo(),
+        'websockets' => $runtime?->supportsWebSockets(),
+        'streaming' => $runtime?->capabilities()->supportsStreamingResponses(),
+        'persistent_state' => $runtime?->capabilities()->supportsPersistentState(),
+        'long_running' => $runtime?->isLongRunning(),
+    ]);
+});
+
+$api->get('/time', function(): Response {
+    $clock = PHAPI::app()?->container()->get(\DateTimeInterface::class);
+    return Response::json(['now' => $clock?->format(DATE_ATOM)]);
+});
+
+$api->get('/plugin', function(): Response {
+    $message = PHAPI::app()?->resolve('greeting');
+    return Response::json(['message' => $message]);
+});
 
 $api->get('/jobs', function(): Response {
     $app = PHAPI::app();

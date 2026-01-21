@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHAPI\Core;
 
 use PHAPI\Runtime\DriverCapabilities;
-use PHAPI\Runtime\HttpRuntimeDriver;
+use PHAPI\Runtime\RuntimeInterface;
 use PHAPI\Runtime\RuntimeSelector;
 
 final class RuntimeManager
@@ -14,7 +14,7 @@ final class RuntimeManager
      * @var array<string, mixed>
      */
     private array $config;
-    private HttpRuntimeDriver $driver;
+    private RuntimeInterface $driver;
     private DriverCapabilities $capabilities;
 
     /**
@@ -29,9 +29,9 @@ final class RuntimeManager
     }
 
     /**
-     * @return HttpRuntimeDriver
+     * @return RuntimeInterface
      */
-    public function driver(): HttpRuntimeDriver
+    public function driver(): RuntimeInterface
     {
         return $this->driver;
     }

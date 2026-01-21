@@ -56,7 +56,9 @@ class RouteBuilder
      */
     public function middleware($middleware): self
     {
-        if (is_string($middleware)) {
+        if (is_string($middleware) && class_exists($middleware)) {
+            $this->middleware[] = ['type' => 'inline', 'handler' => $this->api->classMiddleware($middleware)];
+        } elseif (is_string($middleware)) {
             $parts = explode(':', $middleware, 2);
             $name = $parts[0];
             $args = [];

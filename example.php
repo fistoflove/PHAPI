@@ -5,6 +5,31 @@ require __DIR__ . '/vendor/autoload.php';
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 use PHAPI\Database\DatabaseFacade;
+use PHAPI\Core\Container;
+use PHAPI\HTTP\Request;
+
+final class ExampleStatusController
+{
+    public function __construct(private \DateTimeInterface $clock)
+    {
+    }
+
+    public function show(): Response
+    {
+        return Response::json([
+            'now' => $this->clock->format(DATE_ATOM),
+            'runtime' => PHAPI::app()?->runtime()->name(),
+        ]);
+    }
+}
+
+final class ExampleMiddleware
+{
+    public function __invoke(Request $request, callable $next): Response
+    {
+        return $next($request);
+    }
+}
 
 $api = new PHAPI([
     'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
@@ -43,11 +68,22 @@ if (class_exists(PDO::class) && extension_loaded('pdo_sqlite')) {
     DatabaseFacade::configure(__DIR__ . '/var/log.sqlite');
 }
 
-$api->get('/', function (): Response {
-    return Response::json([
-        'message' => 'PHAPI is running',
-        'endpoints' => ['/process', '/jobs', '/users/{id}', '/search/{query?}'],
-    ]);
+$api->container()->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);
+$api->extend('greeting', function (Container $container): string {
+    return 'Hello from PHAPI';
+});
+$api->middleware(ExampleMiddleware::class);
+
+$api->onBoot(function (): void {
+    // Boot-time hook for runtime initialization.
+});
+
+$api->onWorkerStart(function ($server, int $workerId): void {
+    // Swoole-only hook for per-worker setup.
+});
+
+$api->onShutdown(function (): void {
+    // Cleanup resources.
 });
 
 $api->get('/users/{id}', function (): Response {
@@ -66,6 +102,32 @@ $api->get('/search/{query?}', function (): Response {
         'query' => $request?->param('query'),
     ]);
 })->name('search');
+
+$api->get('/runtime', function (): Response {
+    $app = PHAPI::app();
+    $runtime = $app?->runtime();
+
+    return Response::json([
+        'runtime' => $runtime?->name(),
+        'async_io' => $runtime?->capabilities()->supportsAsyncIo(),
+        'websockets' => $runtime?->supportsWebSockets(),
+        'streaming' => $runtime?->capabilities()->supportsStreamingResponses(),
+        'persistent_state' => $runtime?->capabilities()->supportsPersistentState(),
+        'long_running' => $runtime?->isLongRunning(),
+    ]);
+});
+
+$api->get('/time', function (): Response {
+    $clock = PHAPI::app()?->container()->get(\DateTimeInterface::class);
+    return Response::json(['now' => $clock?->format(DATE_ATOM)]);
+});
+
+$api->get('/info', [ExampleStatusController::class, 'show']);
+
+$api->get('/plugin', function (): Response {
+    $message = PHAPI::app()?->resolve('greeting');
+    return Response::json(['message' => $message]);
+});
 
 $api->post('/process', function (): Response {
     $request = PHAPI::request();

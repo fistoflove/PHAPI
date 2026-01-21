@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
-interface HttpClient
+use PHAPI\Contracts\HttpClientInterface;
+
+interface HttpClient extends HttpClientInterface
 {
     /**
      * Fetch and decode JSON from a URL.

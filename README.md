@@ -38,6 +38,267 @@ $api->get('/', function (): Response {
 $api->run();
 ```
 
+## Dependency Injection
+
+PHAPI exposes a PSR-11 container with autowiring and bindings.
+
+```php
+$api->container()->bind(
+    \DateTimeInterface::class,
+    \DateTimeImmutable::class,
+    true
+);
+
+$api->get('/time', function (): Response {
+    $clock = PHAPI::app()?->container()->get(\DateTimeInterface::class);
+    return Response::json(['now' => $clock?->format(DATE_ATOM)]);
+});
+```
+
+## Service Providers
+
+Register service providers via config to keep modules isolated.
+
+```php
+final class CacheProvider implements \PHAPI\Core\ServiceProviderInterface
+{
+    public function register(\PHAPI\Core\Container $container, \PHAPI\PHAPI $app): void
+    {
+        $container->singleton(CacheInterface::class, FilesystemCache::class);
+    }
+
+    public function boot(\PHAPI\PHAPI $app): void
+    {
+    }
+}
+
+$api = new PHAPI([
+    'providers' => [
+        CacheProvider::class,
+    ],
+]);
+```
+
+Providers run in the order listed. Later providers can override earlier bindings.
+
+## Lifecycle Hooks
+
+Register hooks for boot, worker start, and shutdown.
+
+```php
+$api->onBoot(function (): void {
+    // Warm caches or initialize resources.
+});
+
+$api->onWorkerStart(function ($server, int $workerId): void {
+    // Swoole workers only; in FPM/AMPHP this runs once per request.
+});
+
+$api->onShutdown(function (): void {
+    // Cleanup resources.
+});
+```
+
+Runtime hook semantics:
+
+| Hook | FPM | AMPHP | Swoole |
+| --- | --- | --- | --- |
+| `onBoot` | once per request | once per request | once on server start |
+| `onWorkerStart` | once per request | once per request | once per worker |
+| `onShutdown` | once per request | once per request | once on server shutdown |
+
+In FPM/AMPHP, avoid heavy work in `onWorkerStart()` since it runs every request.
+PHAPI logs a warning in debug mode when `onWorkerStart()` is registered under FPM/AMPHP.
+
+## Runtime Interface
+
+```php
+$runtime = $api->runtime();
+
+$runtime->name(); // fpm, fpm_amphp, swoole, portable_swoole
+$runtime->supportsWebSockets();
+$runtime->isLongRunning();
+```
+
+## Public Contracts
+
+Stable interfaces for integrations live under `PHAPI\Contracts`:
+
+- `PHAPI\Contracts\RuntimeInterface`
+- `PHAPI\Contracts\HttpClientInterface`
+- `PHAPI\Contracts\TaskRunnerInterface`
+- `PHAPI\Contracts\WebSocketDriverInterface`
+
+## Class-Based Handlers
+
+Controllers can be referenced using callable arrays and will be resolved via the container.
+By default they are instantiated per request unless you bind them as singletons.
+
+```php
+final class UserController
+{
+    public function index(): Response
+    {
+        return Response::json(['ok' => true]);
+    }
+}
+
+$api->get('/users', [UserController::class, 'index']);
+```
+
+## Recommended Project Structure (Optional)
+
+PHAPI does not enforce a layout, but this keeps larger apps clean:
+
+```
+app/
+  Controllers/
+  Services/
+  Middleware/
+routes/
+config/
+var/
+public/
+```
+
+See `docs/project-structure.md` for notes.
+
+## DI & Autowiring Example
+
+```php
+final class UserRepository
+{
+    public function all(): array
+    {
+        return [
+            ['id' => 1, 'name' => 'Ada'],
+            ['id' => 2, 'name' => 'Linus'],
+        ];
+    }
+}
+
+final class UserController
+{
+    public function __construct(private UserRepository $repo)
+    {
+    }
+
+    public function index(): Response
+    {
+        return Response::json(['users' => $this->repo->all()]);
+    }
+}
+
+$api->get('/users', [UserController::class, 'index']);
+```
+
+## Container Lifecycles
+
+- `singleton()` returns one instance for the app/worker lifetime.
+- `bind()` (or `bind(..., false)`) returns a new instance per `get()`.
+- `request()` returns one instance per request.
+
+## Autowiring Rules
+
+- Only class-typed constructor parameters are autowired.
+- Scalars must have defaults or be bound in the container.
+- Default values are used when available.
+- Circular dependencies throw a `ContainerException`.
+
+## Tiny Plugin System
+
+```php
+$api->extend('cache', function (Container $container) {
+    return new RedisCache($container->get(Redis::class));
+});
+
+$cache = $api->resolve('cache');
+```
+
+`extend()` is sugar for container bindings. Use providers for reusable packages/modules, and `extend()` for app-local utilities.
+
+Suggested naming to avoid collisions: `vendor.feature` or `feature.variant` (e.g., `metrics.prometheus`).
+
+## AMPHP Runtime Example
+
+```bash
+APP_RUNTIME=amphp php example.php
+```
+
+```php
+$api->get('/external', function (): Response {
+    try {
+        $data = PHAPI::app()?->http()->getJson('https://api.example.com/data');
+        return Response::json(['data' => $data]);
+    } catch (\PHAPI\Exceptions\HttpRequestException $e) {
+        return Response::error('Upstream error', 502, [
+            'status' => $e->status(),
+        ]);
+    }
+});
+```
+
+## Swoole WebSocket Example
+
+```php
+$api = new PHAPI([
+    'runtime' => 'swoole',
+    'enable_websockets' => true,
+]);
+
+$api->setWebSocketHandler(function ($server, $frame, $driver): void {
+    $payload = json_decode($frame->data ?? '', true);
+    if (!is_array($payload)) {
+        return;
+    }
+
+    if ($payload['action'] === 'subscribe') {
+        $driver->subscribe($frame->fd, (string)$payload['channel']);
+    }
+});
+
+$api->get('/broadcast', function (): Response {
+    PHAPI::app()?->realtime()->broadcast('updates', ['ok' => true]);
+    return Response::json(['sent' => true]);
+});
+```
+
+`$driver` is the active Swoole runtime driver. It manages subscriptions via
+`subscribe($fd, $channel)` / `unsubscribe($fd, $channel)` and broadcasts only to subscribers.
+
+Security: authenticate WebSocket upgrades and validate subscribe requests before
+joining channels.
+
+## Task Runner (Advanced)
+
+```php
+$results = PHAPI::app()?->tasks()->parallel([
+    'a' => fn() => ['ok' => true],
+    'b' => fn() => ['count' => 42],
+]);
+```
+
+If any task throws, the task runner throws the first error it encounters.
+
+## Jobs (Lock/Block)
+
+```php
+$api->schedule('cleanup', 300, function () {
+    // ...
+}, [
+    'log_enabled' => true,
+    'log_file' => 'cleanup.log',
+    'lock_mode' => 'block', // or 'skip'
+]);
+```
+
+Lock modes:
+
+- `skip`: if the lock is held, the run is skipped and logged as `skipped`.
+- `block`: waits for the lock (blocking file lock, no timeout).
+
+If a job throws, the run is recorded as `error` and the message is logged.
+
 ## Runtime Selection
 
 - `APP_RUNTIME=fpm` (default)
@@ -114,6 +375,20 @@ $api->addMiddleware('auth', $api->requireAuth());
 
 $api->get('/protected', fn() => Response::json(['ok' => true]))
     ->middleware('auth');
+```
+
+Class-based middleware is resolved via the container:
+
+```php
+final class AuthMiddleware
+{
+    public function __invoke(Request $request, callable $next): Response
+    {
+        return $next($request);
+    }
+}
+
+$api->middleware(AuthMiddleware::class);
 ```
 
 Named middleware supports arguments: `role:admin|manager`.
@@ -206,6 +481,18 @@ $results = $api->tasks()->parallel([
 $data = $api->http()->getJson('https://example.com/api');
 ```
 
+Swap the HTTP client by binding the interface:
+
+```php
+$api->container()->singleton(\PHAPI\Services\HttpClient::class, MyHttpClient::class);
+```
+
+Errors thrown by `getJson()` include HTTP status and raw body via `HttpRequestException`.
+
+## Error Responses
+
+`Response::error()` returns a JSON payload with `error` plus any extra fields you pass.
+
 ## Realtime
 
 ```php
@@ -239,6 +526,9 @@ Broadcast only to subscribers:
 ```php
 $api->realtime()->broadcast('player:123', ['event' => 'ping']);
 ```
+
+The `$driver` argument is the active Swoole runtime driver. Authenticate WebSocket
+connections and validate subscription messages before joining channels.
 
 ## SQLite Helpers
 
@@ -291,11 +581,77 @@ $api = new PHAPI([
 ]);
 ```
 
+## Example Structure
+
+Single-file:
+
+```
+example.php
+```
+
+Multi-file:
+
+```
+examples/multi-file/
+  app.php
+  app/
+    Controllers/
+    jobs.php
+    middlewares.php
+    routes.php
+    tasks.php
+```
+
+## Multi-Runtime Example App
+
+The full example lives at `examples/multi-runtime/app.php` and demonstrates:
+providers, DI/autowiring, class middleware, jobs, tasks, HTTP client, and
+WebSocket subscriptions (when running Swoole).
+
+Run it with:
+
+```bash
+# FPM (built-in server)
+APP_RUNTIME=fpm php -S 127.0.0.1:9503 examples/multi-runtime/app.php
+
+# AMPHP (built-in server)
+APP_RUNTIME=amphp php -S 127.0.0.1:9503 examples/multi-runtime/app.php
+
+# Swoole
+APP_RUNTIME=swoole php examples/multi-runtime/app.php
+```
+
 ## Examples
 
 - `example.php`
 - `examples/single-file.php`
 - `examples/multi-file/app.php`
+- `examples/multi-runtime/app.php`
+
+## Testing PHAPI Apps
+
+You can exercise routes in memory by calling the kernel directly:
+
+```php
+use PHAPI\HTTP\Request;
+use PHAPI\HTTP\Response;
+use PHAPI\PHAPI;
+
+$api = new PHAPI(['runtime' => 'fpm']);
+
+$api->get('/hello', fn() => Response::json(['ok' => true]));
+
+$request = new Request('GET', '/hello');
+$response = $api->kernel()->handle($request);
+
+assert($response->status() === 200);
+```
+
+Override container bindings to inject fakes:
+
+```php
+$api->container()->singleton(\PHAPI\Services\HttpClient::class, FakeHttpClient::class);
+```
 
 ## Tests
 

@@ -3,6 +3,7 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use PHAPI\PHAPI;
+use PHAPI\Core\Container;
 
 $api = new PHAPI([
     'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
@@ -36,6 +37,19 @@ $api = new PHAPI([
 
 $api->enableCORS();
 $api->enableSecurityHeaders();
+$api->container()->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);
+$api->extend('greeting', function (Container $container): string {
+    return 'Hello from PHAPI';
+});
+$api->onBoot(function (): void {
+    // Boot-time hook for runtime initialization.
+});
+$api->onWorkerStart(function ($server, int $workerId): void {
+    // Swoole-only hook for per-worker setup.
+});
+$api->onShutdown(function (): void {
+    // Cleanup resources.
+});
 $api->loadApp(__DIR__ . '/..');
 
 $api->run();

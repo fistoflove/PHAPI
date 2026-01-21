@@ -12,17 +12,17 @@ class RuntimeSelector
      * Select the appropriate runtime driver based on configuration.
      *
      * @param array<string, mixed> $config
-     * @return HttpRuntimeDriver
+     * @return RuntimeInterface
      *
      * @throws FeatureNotSupportedException
      */
-    public static function select(array $config): HttpRuntimeDriver
+    public static function select(array $config): RuntimeInterface
     {
         $runtimeEnv = getenv('APP_RUNTIME');
         $runtime = $config['runtime'] ?? (($runtimeEnv === false || $runtimeEnv === '') ? 'fpm' : $runtimeEnv);
         if ($runtime === 'auto') {
             if (extension_loaded('swoole') && class_exists('Swoole\\Http\\Server')) {
-                return self::createSwoole($config);
+                return self::createSwoole($config, 'swoole');
             }
             return new FpmDriver();
         }
@@ -31,7 +31,7 @@ class RuntimeSelector
             if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
                 throw new FeatureNotSupportedException('Swoole runtime requested but Swoole is not available.');
             }
-            return self::createSwoole($config);
+            return self::createSwoole($config, 'swoole');
         }
 
         if ($runtime === 'portable_swoole') {
@@ -44,7 +44,7 @@ class RuntimeSelector
                     );
                 }
             }
-            return self::createSwoole($config);
+            return self::createSwoole($config, 'portable_swoole');
         }
 
         if ($runtime === 'fpm_amphp' || $runtime === 'amphp') {
@@ -61,11 +61,11 @@ class RuntimeSelector
      * @param array<string, mixed> $config
      * @return SwooleDriver
      */
-    private static function createSwoole(array $config): SwooleDriver
+    private static function createSwoole(array $config, string $runtimeName): SwooleDriver
     {
         $host = $config['host'] ?? '0.0.0.0';
         $port = (int)($config['port'] ?? 9501);
         $enableWebSockets = (bool)($config['enable_websockets'] ?? false);
-        return new SwooleDriver($host, $port, $enableWebSockets);
+        return new SwooleDriver($host, $port, $enableWebSockets, $runtimeName);
     }
 }

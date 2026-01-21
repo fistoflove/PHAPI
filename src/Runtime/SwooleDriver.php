@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHAPI\Runtime;
 
+use PHAPI\Contracts\WebSocketDriverInterface;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\Server\HttpKernel;
 
-class SwooleDriver implements HttpRuntimeDriver
+class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 {
     private string $host;
     private int $port;
     private bool $enableWebSockets;
+    private string $runtimeName;
     private Capabilities $capabilities;
     private ?\Swoole\Server $server = null;
     /**
@@ -24,6 +26,14 @@ class SwooleDriver implements HttpRuntimeDriver
      */
     private $onWorkerStart = null;
     /**
+     * @var callable(): void|null
+     */
+    private $onBoot = null;
+    /**
+     * @var callable(): void|null
+     */
+    private $onShutdown = null;
+    /**
      * @var callable(\Swoole\WebSocket\Server, mixed, self): void|null
      */
     private $webSocketHandler = null;
@@ -34,14 +44,44 @@ class SwooleDriver implements HttpRuntimeDriver
      * @param string $host
      * @param int $port
      * @param bool $enableWebSockets
+     * @param string $runtimeName
      * @return void
      */
-    public function __construct(string $host = '0.0.0.0', int $port = 9501, bool $enableWebSockets = false)
-    {
+    public function __construct(
+        string $host = '0.0.0.0',
+        int $port = 9501,
+        bool $enableWebSockets = false,
+        string $runtimeName = 'swoole'
+    ) {
         $this->host = $host;
         $this->port = $port;
         $this->enableWebSockets = $enableWebSockets;
+        $this->runtimeName = $runtimeName;
         $this->capabilities = new Capabilities(true, $enableWebSockets, true, true);
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function name(): string
+    {
+        return $this->runtimeName;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function supportsWebSockets(): bool
+    {
+        return $this->capabilities->supportsWebSockets();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isLongRunning(): bool
+    {
+        return true;
     }
 
     /**
@@ -52,6 +92,9 @@ class SwooleDriver implements HttpRuntimeDriver
      */
     public function start(HttpKernel $kernel): void
     {
+        if ($this->onBoot !== null) {
+            ($this->onBoot)();
+        }
         if ($this->enableWebSockets) {
             $server = new \Swoole\WebSocket\Server($this->host, $this->port);
             $this->server = $server;
@@ -78,6 +121,13 @@ class SwooleDriver implements HttpRuntimeDriver
                 });
             }
 
+            if ($this->onShutdown !== null) {
+                $handler = $this->onShutdown;
+                $server->on('shutdown', function () use ($handler) {
+                    $handler();
+                });
+            }
+
             $server->on('request', function ($request, $response) use ($kernel) {
                 $httpRequest = $this->buildRequest($request);
                 $httpResponse = $kernel->handle($httpRequest);
@@ -95,6 +145,13 @@ class SwooleDriver implements HttpRuntimeDriver
             $handler = $this->onWorkerStart;
             $server->on('workerStart', function ($server, int $workerId) use ($handler) {
                 $handler($server, $workerId);
+            });
+        }
+
+        if ($this->onShutdown !== null) {
+            $handler = $this->onShutdown;
+            $server->on('shutdown', function () use ($handler) {
+                $handler();
             });
         }
 
@@ -149,6 +206,22 @@ class SwooleDriver implements HttpRuntimeDriver
     public function onWorkerStart(callable $handler): void
     {
         $this->onWorkerStart = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onBoot(callable $handler): void
+    {
+        $this->onBoot = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onShutdown(callable $handler): void
+    {
+        $this->onShutdown = $handler;
     }
 
     /**

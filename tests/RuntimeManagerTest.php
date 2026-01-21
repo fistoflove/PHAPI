@@ -16,5 +16,7 @@ final class RuntimeManagerTest extends TestCase
 
         $this->assertInstanceOf(FpmDriver::class, $manager->driver());
         $this->assertNotNull($manager->capabilities());
+        $this->assertSame('fpm', $manager->driver()->name());
+        $this->assertFalse($manager->driver()->isLongRunning());
     }
 }

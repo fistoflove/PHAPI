@@ -13,12 +13,12 @@ use PHAPI\Core\Container;
 use PHAPI\Core\DefaultEndpoints;
 use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
+use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
 use PHAPI\Runtime\DriverCapabilities;
-use PHAPI\Runtime\PortableSwooleLoader;
 use PHAPI\Runtime\SwooleDriver;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
@@ -56,6 +56,11 @@ final class PHAPI
     private AuthConfigurator $authConfigurator;
     private JobsScheduler $jobsScheduler;
     private DefaultEndpoints $defaultEndpoints;
+    private ProviderLoader $providerLoader;
+    /**
+     * @var array<int, \PHAPI\Core\ServiceProviderInterface>
+     */
+    private array $providers = [];
     /**
      * @var callable(string, array<string, mixed>): void|null
      */
@@ -94,6 +99,7 @@ final class PHAPI
         $this->bootstrapper = new AppBootstrapper();
         $this->jobsScheduler = new JobsScheduler();
         $this->defaultEndpoints = new DefaultEndpoints();
+        $this->providerLoader = new ProviderLoader();
 
         $this->runtimeManager = new RuntimeManager($this->config);
 
@@ -111,6 +117,8 @@ final class PHAPI
             $this->realtimeFallback,
             $this->webSocketHandler
         );
+        $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
+        $this->providerLoader->boot($this->providers, $this);
         $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
         $this->defaultEndpoints->register($this, $this->jobs, $this->config);
     }
@@ -212,6 +220,45 @@ final class PHAPI
     }
 
     /**
+     * Register a boot hook for the active runtime.
+     *
+     * @param callable(): void $handler
+     * @return self
+     */
+    public function onBoot(callable $handler): self
+    {
+        $this->runtimeManager->driver()->onBoot($handler);
+        return $this;
+    }
+
+    /**
+     * Register a worker-start hook for the active runtime.
+     *
+     * @param callable(mixed, int): void $handler
+     * @return self
+     */
+    public function onWorkerStart(callable $handler): self
+    {
+        if ($this->runtimeManager->driver()->isLongRunning() === false && (bool)($this->config['debug'] ?? false)) {
+            error_log('PHAPI: onWorkerStart runs once per request in FPM/AMPHP. Avoid heavy work there.');
+        }
+        $this->runtimeManager->driver()->onWorkerStart($handler);
+        return $this;
+    }
+
+    /**
+     * Register a shutdown hook for the active runtime.
+     *
+     * @param callable(): void $handler
+     * @return self
+     */
+    public function onShutdown(callable $handler): self
+    {
+        $this->runtimeManager->driver()->onShutdown($handler);
+        return $this;
+    }
+
+    /**
      * Return the active runtime capabilities.
      *
      * @return DriverCapabilities
@@ -222,28 +269,23 @@ final class PHAPI
     }
 
     /**
+     * Return the active runtime driver.
+     *
+     * @return \PHAPI\Runtime\RuntimeInterface
+     */
+    public function runtime(): \PHAPI\Runtime\RuntimeInterface
+    {
+        return $this->runtimeManager->driver();
+    }
+
+    /**
      * Return the effective runtime name.
      *
      * @return string
      */
     public function runtimeName(): string
     {
-        $runtime = $this->config['runtime'] ?? 'fpm';
-        if ($runtime === 'auto') {
-            $capabilities = $this->runtimeManager->capabilities();
-            return $capabilities->supportsPersistentState()
-                ? 'swoole'
-                : ($capabilities->supportsAsyncIo() ? 'fpm_amphp' : 'fpm');
-        }
-
-        if ($runtime === 'portable_swoole') {
-            if (PortableSwooleLoader::wasLoaded() || getenv('PHAPI_PORTABLE_SWOOLE_USED') === '1') {
-                return 'portable_swoole';
-            }
-            return 'swoole';
-        }
-
-        return $runtime;
+        return $this->runtimeManager->driver()->name();
     }
 
     /**
@@ -254,6 +296,46 @@ final class PHAPI
     public function container(): Container
     {
         return $this->container;
+    }
+
+    /**
+     * Access the HTTP kernel for in-memory testing.
+     *
+     * @return HttpKernel
+     */
+    public function kernel(): HttpKernel
+    {
+        return $this->kernel;
+    }
+
+    /**
+     * Register a lightweight extension backed by the container.
+     *
+     * @param string $id
+     * @param callable(Container): mixed $factory
+     * @param bool $singleton
+     * @return self
+     */
+    public function extend(string $id, callable $factory, bool $singleton = true): self
+    {
+        if ($singleton) {
+            $this->container->singleton($id, $factory);
+        } else {
+            $this->container->bind($id, $factory, false);
+        }
+
+        return $this;
+    }
+
+    /**
+     * Resolve an entry from the container.
+     *
+     * @param string $id
+     * @return mixed
+     */
+    public function resolve(string $id)
+    {
+        return $this->container->get($id);
     }
 
     /**
@@ -466,6 +548,11 @@ final class PHAPI
      */
     public function middleware($handler)
     {
+        if (is_string($handler) && class_exists($handler)) {
+            $this->middleware->addGlobalMiddleware($this->classMiddleware($handler));
+            return $this;
+        }
+
         if (is_string($handler)) {
             return $this->createRouteBuilderWithMiddleware($handler);
         }
@@ -476,6 +563,28 @@ final class PHAPI
         }
 
         throw new \InvalidArgumentException('middleware() expects a callable (global middleware) or string (named middleware)');
+    }
+
+    /**
+     * Build a middleware callable from an invokable class.
+     *
+     * @param class-string $class
+     * @return callable(Request): mixed|callable(Request, callable(Request): \PHAPI\HTTP\Response): mixed
+     */
+    public function classMiddleware(string $class): callable
+    {
+        return function (Request $request, callable $next) use ($class) {
+            $instance = $this->container->get($class);
+            if (!is_callable($instance)) {
+                throw new \RuntimeException("Middleware class '{$class}' is not invokable.");
+            }
+            $callable = \Closure::fromCallable($instance);
+            $paramCount = (new \ReflectionFunction($callable))->getNumberOfParameters();
+            if ($paramCount <= 1) {
+                return $instance($request);
+            }
+            return $instance($request, $next);
+        };
     }
 
     /**

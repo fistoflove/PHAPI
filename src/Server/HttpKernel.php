@@ -57,6 +57,7 @@ class HttpKernel
      */
     public function handle(Request $request): Response
     {
+        $this->container->beginRequestScope();
         RequestContext::set($request);
         $start = microtime(true);
         $requestId = $request->header('x-request-id') ?? bin2hex(random_bytes(8));
@@ -92,6 +93,7 @@ class HttpKernel
             $response = $this->errorHandler->handle($e, $request);
         } finally {
             RequestContext::clear();
+            $this->container->endRequestScope();
         }
 
         $response = $response->withHeader('X-Request-Id', $requestId);

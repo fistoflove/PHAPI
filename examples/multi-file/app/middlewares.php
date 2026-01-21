@@ -1,10 +1,21 @@
 <?php
 
 use PHAPI\HTTP\Response;
+use PHAPI\HTTP\Request;
+
+final class ExampleMiddleware
+{
+    public function __invoke(Request $request, callable $next): Response
+    {
+        return $next($request);
+    }
+}
 
 $api->middleware(function($request, $next) {
     return $next($request);
 });
+
+$api->middleware(ExampleMiddleware::class);
 
 $api->afterMiddleware(function($request, $response) {
     return $response;

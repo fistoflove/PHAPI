@@ -11,6 +11,7 @@ return [
     'default_endpoints' => [
         'monitor' => true,
     ],
+    'providers' => [],
     'jobs_log_dir' => getcwd() . '/var/jobs',
     'jobs_log_limit' => 200,
     'jobs_log_rotate_bytes' => 1048576,

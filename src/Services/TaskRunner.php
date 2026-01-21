@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
-interface TaskRunner
+use PHAPI\Contracts\TaskRunnerInterface;
+
+interface TaskRunner extends TaskRunnerInterface
 {
     /**
      * Run tasks in parallel when supported.

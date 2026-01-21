@@ -21,6 +21,22 @@ class AmpFpmDriver extends FpmDriver
 
     /**
      * {@inheritDoc}
+     */
+    public function name(): string
+    {
+        return 'fpm_amphp';
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function isLongRunning(): bool
+    {
+        return false;
+    }
+
+    /**
+     * {@inheritDoc}
      *
      * @return DriverCapabilities
      */
