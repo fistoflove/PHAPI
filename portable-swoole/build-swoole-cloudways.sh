@@ -35,7 +35,7 @@ if docker build \
 FROM php:8.1-cli-bullseye
 
 RUN apt-get update && \
-    apt-get install -y build-essential git && \
+    apt-get install -y build-essential git libssl-dev && \
     rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
@@ -43,7 +43,7 @@ WORKDIR /build
 RUN git clone --depth 1 --branch v5.1.0 https://github.com/swoole/swoole-src.git swoole-src && \
     cd swoole-src && \
     phpize && \
-    ./configure && \
+    ./configure --enable-openssl && \
     make -j$(nproc) && \
     mkdir -p /output && \
     cp modules/swoole.so /output/swoole.so && \

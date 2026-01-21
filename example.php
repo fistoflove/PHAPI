@@ -11,7 +11,6 @@ $api = new PHAPI([
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
-    'default_endpoints' => false,
     'max_body_bytes' => 1024 * 1024,
     'access_logger' => function ($request, $response, array $meta) {
         $line = sprintf(
@@ -47,24 +46,9 @@ if (class_exists(PDO::class) && extension_loaded('pdo_sqlite')) {
 $api->get('/', function (): Response {
     return Response::json([
         'message' => 'PHAPI is running',
-        'endpoints' => ['/health', '/process', '/monitor', '/jobs', '/users/{id}', '/search/{query?}'],
+        'endpoints' => ['/process', '/jobs', '/users/{id}', '/search/{query?}'],
     ]);
 });
-
-$api->get('/health', function (): Response {
-    $request = PHAPI::request();
-    $app = PHAPI::app();
-    $start = $request?->server()['REQUEST_TIME_FLOAT'] ?? microtime(true);
-    $durationUs = (int)round((microtime(true) - $start) * 1000000);
-
-    return Response::json([
-        'ok' => true,
-        'time' => date('c'),
-        'runtime' => $app?->runtimeName(),
-        'response_us' => $durationUs,
-    ]);
-});
-
 
 $api->get('/users/{id}', function (): Response {
     $request = PHAPI::request();
@@ -117,18 +101,6 @@ $api->schedule('log_ping', 10, function () {
     'log_enabled' => true,
     'lock_mode' => 'skip',
 ]);
-
-$api->get('/monitor', function (): Response {
-    $db = DatabaseFacade::getConnection();
-    if ($db === null) {
-        return Response::json(['error' => 'Database not configured'], 500);
-    }
-
-    $db->exec("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
-    $rows = $db->query("SELECT id, message, created_at FROM logs ORDER BY id DESC LIMIT 50")->fetchAll();
-
-    return Response::json(['logs' => array_reverse($rows)]);
-});
 
 $api->get('/jobs', function (): Response {
     $app = PHAPI::app();

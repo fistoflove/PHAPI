@@ -7,20 +7,6 @@ $api->get('/', function(): Response {
     return Response::json(['message' => 'Multi-file app running']);
 });
 
-$api->get('/health', function(): Response {
-    $request = PHAPI::request();
-    $app = PHAPI::app();
-    $start = $request?->server()['REQUEST_TIME_FLOAT'] ?? microtime(true);
-    $durationUs = (int)round((microtime(true) - $start) * 1000000);
-
-    return Response::json([
-        'ok' => true,
-        'time' => date('c'),
-        'runtime' => $app?->runtimeName(),
-        'response_us' => $durationUs,
-    ]);
-});
-
 $api->get('/users/{id}', function(): Response {
     $request = PHAPI::request();
     $app = PHAPI::app();
