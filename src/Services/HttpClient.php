@@ -11,6 +11,16 @@ interface HttpClient
      *
      * @param string $url
      * @return array<string, mixed>
+     *
+     * @throws \PHAPI\Exceptions\HttpRequestException
      */
     public function getJson(string $url): array;
+
+    /**
+     * Fetch JSON with metadata.
+     *
+     * @param string $url
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    public function getJsonWithMeta(string $url): array;
 }

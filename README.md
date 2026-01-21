@@ -65,18 +65,17 @@ Or use the runner:
 APP_RUNTIME=portable_swoole php vendor/bin/phapi-run app.php
 ```
 
-PHAPI registers `/health` and `/monitor` by default. Disable them if you want to provide your own handlers:
+PHAPI registers `/monitor` by default. Disable it if you want to provide your own handler:
 
 ```php
 $api = new PHAPI([
     'default_endpoints' => [
-        'health' => true,
         'monitor' => false,
     ],
 ]);
 ```
 
-When using the runner, PHAPI will mark the runtime as `portable_swoole` in `/health`.
+When using the runner, PHAPI will mark the runtime as `portable_swoole` in `/monitor`.
 
 ## Routing
 

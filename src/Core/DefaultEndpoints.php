@@ -20,22 +20,6 @@ final class DefaultEndpoints
      */
     public function register(PHAPI $app, JobsManager $jobs, array $config): void
     {
-        if ($this->isEnabled($config, 'health')) {
-            $app->get('/health', static function (): Response {
-                $request = PHAPI::request();
-                $appInstance = PHAPI::app();
-                $start = $request?->server()['REQUEST_TIME_FLOAT'] ?? microtime(true);
-                $durationUs = (int)round((microtime(true) - $start) * 1000000);
-
-                return Response::json([
-                    'ok' => true,
-                    'time' => date('c'),
-                    'runtime' => $appInstance?->runtimeName(),
-                    'response_us' => $durationUs,
-                ]);
-            });
-        }
-
         if ($this->isEnabled($config, 'monitor')) {
             $app->get('/monitor', static function () use ($jobs): Response {
                 $appInstance = PHAPI::app();
@@ -61,7 +45,6 @@ final class DefaultEndpoints
     private function isEnabled(array $config, string $name): bool
     {
         $defaults = $config['default_endpoints'] ?? [
-            'health' => true,
             'monitor' => true,
         ];
 

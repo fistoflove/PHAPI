@@ -89,6 +89,7 @@ namespace Swoole\Coroutine\Http;
 class Client
 {
     public string $body = '';
+    public int $statusCode = 0;
     public function __construct(string $host, int $port, bool $ssl = false)
     {
     }

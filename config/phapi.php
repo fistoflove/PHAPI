@@ -9,7 +9,6 @@ return [
     'port' => 9501,
     'enable_websockets' => false,
     'default_endpoints' => [
-        'health' => true,
         'monitor' => true,
     ],
     'jobs_log_dir' => getcwd() . '/var/jobs',

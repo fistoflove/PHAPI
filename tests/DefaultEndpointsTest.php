@@ -14,7 +14,6 @@ final class DefaultEndpointsTest extends TestCase
     {
         $api = new PHAPI([
             'default_endpoints' => [
-                'health' => true,
                 'monitor' => true,
             ],
         ]);
@@ -24,7 +23,6 @@ final class DefaultEndpointsTest extends TestCase
             return $route['path'];
         }, $router->getRoutes());
 
-        $this->assertContains('/health', $paths);
         $this->assertContains('/monitor', $paths);
     }
 

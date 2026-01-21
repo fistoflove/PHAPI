@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
+use PHAPI\Exceptions\HttpRequestException;
+
 class SwooleHttpClient implements HttpClient
 {
     /**
@@ -19,9 +21,32 @@ class SwooleHttpClient implements HttpClient
             return $fallback->getJson($url);
         }
 
+        $meta = $this->getJsonWithMeta($url);
+        if ($meta['status'] < 200 || $meta['status'] >= 300) {
+            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'HTTP request returned non-2xx status');
+        }
+
+        if ($meta['data'] === null) {
+            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'Failed to decode JSON response');
+        }
+
+        return $meta['data'];
+    }
+
+    /**
+     * @param string $url
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    public function getJsonWithMeta(string $url): array
+    {
+        if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
+            $fallback = new BlockingHttpClient();
+            return $fallback->getJsonWithMeta($url);
+        }
+
         $parts = parse_url($url);
         if ($parts === false || !isset($parts['host'])) {
-            return [];
+            throw new HttpRequestException($url, 0, '', 'Invalid URL');
         }
 
         $scheme = $parts['scheme'] ?? 'http';
@@ -35,10 +60,17 @@ class SwooleHttpClient implements HttpClient
         $client = new \Swoole\Coroutine\Http\Client($host, $port, $scheme === 'https');
         $client->set(['timeout' => 5]);
         $client->get($path);
+        $status = $client->statusCode;
         $body = $client->body ?? '';
         $client->close();
 
         $decoded = json_decode($body, true);
-        return json_last_error() === JSON_ERROR_NONE ? $decoded : [];
+        $data = json_last_error() === JSON_ERROR_NONE ? $decoded : null;
+
+        return [
+            'data' => $data,
+            'status' => $status,
+            'body' => $body,
+        ];
     }
 }
