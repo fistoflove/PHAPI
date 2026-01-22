@@ -12,17 +12,13 @@ class FpmDriver implements RuntimeInterface
 {
     private Capabilities $capabilities;
     /**
-     * @var callable(): void|null
+     * @var callable(Request): void|null
      */
-    private $onBoot = null;
+    private $onRequestStart = null;
     /**
-     * @var callable(mixed, int): void|null
+     * @var callable(Request, Response): void|null
      */
-    private $onWorkerStart = null;
-    /**
-     * @var callable(): void|null
-     */
-    private $onShutdown = null;
+    private $onRequestEnd = null;
 
     /**
      * Initialize the FPM driver with synchronous capabilities.
@@ -66,17 +62,14 @@ class FpmDriver implements RuntimeInterface
      */
     public function start(HttpKernel $kernel): void
     {
-        if ($this->onBoot !== null) {
-            ($this->onBoot)();
-        }
-        if ($this->onWorkerStart !== null) {
-            ($this->onWorkerStart)(null, 0);
-        }
         $request = Request::fromGlobals();
+        if ($this->onRequestStart !== null) {
+            ($this->onRequestStart)($request);
+        }
         $response = $kernel->handle($request);
         $this->emit($response);
-        if ($this->onShutdown !== null) {
-            ($this->onShutdown)();
+        if ($this->onRequestEnd !== null) {
+            ($this->onRequestEnd)($request, $response);
         }
     }
 
@@ -95,7 +88,6 @@ class FpmDriver implements RuntimeInterface
      */
     public function onBoot(callable $handler): void
     {
-        $this->onBoot = $handler;
     }
 
     /**
@@ -103,7 +95,6 @@ class FpmDriver implements RuntimeInterface
      */
     public function onWorkerStart(callable $handler): void
     {
-        $this->onWorkerStart = $handler;
     }
 
     /**
@@ -111,7 +102,22 @@ class FpmDriver implements RuntimeInterface
      */
     public function onShutdown(callable $handler): void
     {
-        $this->onShutdown = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onRequestStart(callable $handler): void
+    {
+        $this->onRequestStart = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onRequestEnd(callable $handler): void
+    {
+        $this->onRequestEnd = $handler;
     }
 
     private function emit(Response $response): void

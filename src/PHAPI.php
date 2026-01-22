@@ -120,6 +120,7 @@ final class PHAPI
         $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
         $this->providerLoader->boot($this->providers, $this);
         $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
+        $this->bootstrapper->configureDatabase($this->config);
         $this->defaultEndpoints->register($this, $this->jobs, $this->config);
     }
 
@@ -240,7 +241,7 @@ final class PHAPI
     public function onWorkerStart(callable $handler): self
     {
         if ($this->runtimeManager->driver()->isLongRunning() === false && (bool)($this->config['debug'] ?? false)) {
-            error_log('PHAPI: onWorkerStart runs once per request in FPM/AMPHP. Avoid heavy work there.');
+            error_log('PHAPI: onWorkerStart is Swoole-only and is ignored in FPM/AMPHP.');
         }
         $this->runtimeManager->driver()->onWorkerStart($handler);
         return $this;
@@ -255,6 +256,30 @@ final class PHAPI
     public function onShutdown(callable $handler): self
     {
         $this->runtimeManager->driver()->onShutdown($handler);
+        return $this;
+    }
+
+    /**
+     * Register a request-start hook for the active runtime.
+     *
+     * @param callable(\PHAPI\HTTP\Request): void $handler
+     * @return self
+     */
+    public function onRequestStart(callable $handler): self
+    {
+        $this->runtimeManager->driver()->onRequestStart($handler);
+        return $this;
+    }
+
+    /**
+     * Register a request-end hook for the active runtime.
+     *
+     * @param callable(\PHAPI\HTTP\Request, \PHAPI\HTTP\Response): void $handler
+     * @return self
+     */
+    public function onRequestEnd(callable $handler): self
+    {
+        $this->runtimeManager->driver()->onRequestEnd($handler);
         return $this;
     }
 

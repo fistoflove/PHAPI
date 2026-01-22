@@ -1,11 +1,6 @@
 <?php
 
-// Support both Composer and bootstrap.php
-if (file_exists(__DIR__ . '/../vendor/autoload.php')) {
-    require __DIR__ . '/../vendor/autoload.php';
-} elseif (file_exists(__DIR__ . '/../bootstrap.php')) {
-    require __DIR__ . '/../bootstrap.php';
-}
+declare(strict_types=1);
 
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
@@ -35,39 +30,6 @@ final class ExampleMiddleware
     }
 }
 
-$api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
-    'host' => '0.0.0.0',
-    'port' => 9503,
-    'debug' => true,
-    'max_body_bytes' => 1024 * 1024,
-    'access_logger' => function ($request, $response, array $meta) {
-        $line = sprintf(
-            '[%s] %s %s %d %sms %s',
-            date('c'),
-            $request->method(),
-            $request->path(),
-            $response->status(),
-            $meta['duration_ms'],
-            $meta['request_id']
-        );
-        error_log($line);
-    },
-    'auth' => [
-        'default' => 'token',
-        'token_resolver' => function (string $token) {
-            if ($token === 'test-token') {
-                return ['id' => 1, 'roles' => ['admin']];
-            }
-            return null;
-        },
-        'session_key' => 'user',
-    ],
-]);
-
-$api->enableCORS();
-$api->enableSecurityHeaders();
-
 $api->container()->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);
 $api->extend('greeting', function (Container $container): string {
     return 'Hello from PHAPI';
@@ -75,15 +37,23 @@ $api->extend('greeting', function (Container $container): string {
 $api->middleware(ExampleMiddleware::class);
 
 $api->onBoot(function (): void {
-    // Boot-time hook for runtime initialization.
+    // Boot-time hook (Swoole only).
 });
 
 $api->onWorkerStart(function ($server, int $workerId): void {
-    // Swoole-only hook for per-worker setup.
+    // Worker hook (Swoole only).
+});
+
+$api->onRequestStart(function (Request $request): void {
+    // Request hook (all runtimes).
+});
+
+$api->onRequestEnd(function (Request $request, Response $response): void {
+    // Request hook (all runtimes).
 });
 
 $api->onShutdown(function (): void {
-    // Cleanup resources.
+    // Shutdown hook (Swoole only).
 });
 
 $api->get('/', fn() => Response::json(['message' => 'Hello from PHAPI']));
@@ -105,8 +75,7 @@ $api->get('/search/{query?}', function (): Response {
 })->name('search');
 
 $api->get('/runtime', function (): Response {
-    $app = PHAPI::app();
-    $runtime = $app?->runtime();
+    $runtime = PHAPI::app()?->runtime();
 
     return Response::json([
         'runtime' => $runtime?->name(),
@@ -175,4 +144,4 @@ $api->schedule('silent', 120, function () {
     'lock_mode' => 'block',
 ]);
 
-$api->run();
+return $api;

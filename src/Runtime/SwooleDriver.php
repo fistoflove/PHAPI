@@ -34,6 +34,14 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      */
     private $onShutdown = null;
     /**
+     * @var callable(Request): void|null
+     */
+    private $onRequestStart = null;
+    /**
+     * @var callable(Request, Response): void|null
+     */
+    private $onRequestEnd = null;
+    /**
      * @var callable(\Swoole\WebSocket\Server, mixed, self): void|null
      */
     private $webSocketHandler = null;
@@ -130,8 +138,14 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
             $server->on('request', function ($request, $response) use ($kernel) {
                 $httpRequest = $this->buildRequest($request);
+                if ($this->onRequestStart !== null) {
+                    ($this->onRequestStart)($httpRequest);
+                }
                 $httpResponse = $kernel->handle($httpRequest);
                 $this->emit($response, $httpResponse);
+                if ($this->onRequestEnd !== null) {
+                    ($this->onRequestEnd)($httpRequest, $httpResponse);
+                }
             });
 
             $server->start();
@@ -157,8 +171,14 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
         $server->on('request', function ($request, $response) use ($kernel) {
             $httpRequest = $this->buildRequest($request);
+            if ($this->onRequestStart !== null) {
+                ($this->onRequestStart)($httpRequest);
+            }
             $httpResponse = $kernel->handle($httpRequest);
             $this->emit($response, $httpResponse);
+            if ($this->onRequestEnd !== null) {
+                ($this->onRequestEnd)($httpRequest, $httpResponse);
+            }
         });
 
         $server->start();
@@ -222,6 +242,22 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     public function onShutdown(callable $handler): void
     {
         $this->onShutdown = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onRequestStart(callable $handler): void
+    {
+        $this->onRequestStart = $handler;
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    public function onRequestEnd(callable $handler): void
+    {
+        $this->onRequestEnd = $handler;
     }
 
     /**

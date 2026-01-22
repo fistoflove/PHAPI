@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHAPI\Core;
 
 use PHAPI\Auth\AuthManager;
+use PHAPI\Database\DatabaseFacade;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 use PHAPI\Runtime\DriverCapabilities;
@@ -100,6 +101,36 @@ final class AppBootstrapper
                 return $next($request);
             });
         }
+    }
+
+    /**
+     * Configure optional database integration.
+     *
+     * @param array<string, mixed> $config
+     * @return void
+     */
+    public function configureDatabase(array $config): void
+    {
+        $database = $config['database'] ?? null;
+        if ($database === null) {
+            return;
+        }
+
+        $path = is_array($database) ? ($database['path'] ?? null) : $database;
+        if (!is_string($path) || $path === '') {
+            return;
+        }
+
+        if (!class_exists(\PDO::class) || !extension_loaded('pdo_sqlite')) {
+            return;
+        }
+
+        $options = [];
+        if (is_array($database)) {
+            $options = $database['options'] ?? [];
+        }
+
+        DatabaseFacade::configure($path, is_array($options) ? $options : []);
     }
 
     /**

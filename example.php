@@ -64,10 +64,6 @@ $api = new PHAPI([
 // Security headers middleware (basic defaults)
 $api->enableSecurityHeaders();
 
-if (class_exists(PDO::class) && extension_loaded('pdo_sqlite')) {
-    DatabaseFacade::configure(__DIR__ . '/var/log.sqlite');
-}
-
 $api->container()->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);
 $api->extend('greeting', function (Container $container): string {
     return 'Hello from PHAPI';
@@ -75,15 +71,23 @@ $api->extend('greeting', function (Container $container): string {
 $api->middleware(ExampleMiddleware::class);
 
 $api->onBoot(function (): void {
-    // Boot-time hook for runtime initialization.
+    // Boot-time hook (Swoole only).
 });
 
 $api->onWorkerStart(function ($server, int $workerId): void {
-    // Swoole-only hook for per-worker setup.
+    // Worker hook (Swoole only).
+});
+
+$api->onRequestStart(function (\PHAPI\HTTP\Request $request): void {
+    // Request hook (all runtimes).
+});
+
+$api->onRequestEnd(function (\PHAPI\HTTP\Request $request, Response $response): void {
+    // Request hook (all runtimes).
 });
 
 $api->onShutdown(function (): void {
-    // Cleanup resources.
+    // Shutdown hook (Swoole only).
 });
 
 $api->get('/users/{id}', function (): Response {

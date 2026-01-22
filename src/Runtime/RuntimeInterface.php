@@ -30,6 +30,22 @@ interface RuntimeInterface extends PublicRuntimeInterface, HttpRuntimeDriver
     public function isLongRunning(): bool;
 
     /**
+     * Register a request-start hook.
+     *
+     * @param callable(\PHAPI\HTTP\Request): void $handler
+     * @return void
+     */
+    public function onRequestStart(callable $handler): void;
+
+    /**
+     * Register a request-end hook.
+     *
+     * @param callable(\PHAPI\HTTP\Request, \PHAPI\HTTP\Response): void $handler
+     * @return void
+     */
+    public function onRequestEnd(callable $handler): void;
+
+    /**
      * Register a boot hook.
      *
      * @param callable(): void $handler

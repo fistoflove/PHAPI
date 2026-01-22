@@ -87,15 +87,23 @@ Register hooks for boot, worker start, and shutdown.
 
 ```php
 $api->onBoot(function (): void {
-    // Warm caches or initialize resources.
+    // Boot-time hook (Swoole only).
 });
 
 $api->onWorkerStart(function ($server, int $workerId): void {
-    // Swoole workers only; in FPM/AMPHP this runs once per request.
+    // Worker hook (Swoole only).
+});
+
+$api->onRequestStart(function (Request $request): void {
+    // Request hook (all runtimes).
+});
+
+$api->onRequestEnd(function (Request $request, Response $response): void {
+    // Request hook (all runtimes).
 });
 
 $api->onShutdown(function (): void {
-    // Cleanup resources.
+    // Shutdown hook (Swoole only).
 });
 ```
 
@@ -103,11 +111,12 @@ Runtime hook semantics:
 
 | Hook | FPM | AMPHP | Swoole |
 | --- | --- | --- | --- |
-| `onBoot` | once per request | once per request | once on server start |
-| `onWorkerStart` | once per request | once per request | once per worker |
-| `onShutdown` | once per request | once per request | once on server shutdown |
+| `onRequestStart` | once per request | once per request | once per request |
+| `onRequestEnd` | once per request | once per request | once per request |
+| `onBoot` | no-op | no-op | once on server start |
+| `onWorkerStart` | no-op | no-op | once per worker |
+| `onShutdown` | no-op | no-op | once on server shutdown |
 
-In FPM/AMPHP, avoid heavy work in `onWorkerStart()` since it runs every request.
 PHAPI logs a warning in debug mode when `onWorkerStart()` is registered under FPM/AMPHP.
 
 ## Runtime Interface
@@ -540,6 +549,15 @@ DatabaseFacade::setOption('site_name', 'My App');
 $value = DatabaseFacade::option('site_name');
 ```
 
+You can opt in to SQLite via `config/phapi.php`:
+
+```php
+'database' => [
+    'path' => getcwd() . '/var/app.sqlite',
+    'options' => [],
+],
+```
+
 ## Request Context Helpers
 
 Handlers can be `function (): Response` and access context statically:
@@ -583,10 +601,12 @@ $api = new PHAPI([
 
 ## Example Structure
 
-Single-file:
+Two-file:
 
 ```
-example.php
+examples/two-file/
+  index.php
+  app.php
 ```
 
 Multi-file:
@@ -624,7 +644,7 @@ APP_RUNTIME=swoole php examples/multi-runtime/app.php
 ## Examples
 
 - `example.php`
-- `examples/single-file.php`
+- `examples/two-file/index.php`
 - `examples/multi-file/app.php`
 - `examples/multi-runtime/app.php`
 

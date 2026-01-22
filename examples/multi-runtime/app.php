@@ -33,15 +33,23 @@ $api = new PHAPI([
 $api->enableSecurityHeaders();
 
 $api->onBoot(function (): void {
-    // Warm caches or initialize resources.
+    // Boot-time hook (Swoole only).
 });
 
 $api->onWorkerStart(function ($server, int $workerId): void {
-    // Worker-specific setup in Swoole.
+    // Worker hook (Swoole only).
+});
+
+$api->onRequestStart(function (\PHAPI\HTTP\Request $request): void {
+    // Request hook (all runtimes).
+});
+
+$api->onRequestEnd(function (\PHAPI\HTTP\Request $request, \PHAPI\HTTP\Response $response): void {
+    // Request hook (all runtimes).
 });
 
 $api->onShutdown(function (): void {
-    // Cleanup resources.
+    // Shutdown hook (Swoole only).
 });
 
 $runtime = $api->runtime();
