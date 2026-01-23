@@ -6,9 +6,8 @@ namespace PHAPI\Tests;
 
 use PHAPI\PHAPI;
 use PHAPI\Server\Router;
-use PHPUnit\Framework\TestCase;
 
-final class DefaultEndpointsTest extends TestCase
+final class DefaultEndpointsTest extends SwooleTestCase
 {
     public function testDefaultEndpointsAreRegistered(): void
     {

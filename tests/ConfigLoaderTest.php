@@ -23,12 +23,12 @@ final class ConfigLoaderTest extends TestCase
     {
         $loader = new ConfigLoader();
         $config = $loader->load([
-            'runtime' => 'fpm_amphp',
+            'runtime' => 'swoole',
             'debug' => true,
             'jobs_log_limit' => 50,
         ]);
 
-        $this->assertSame('fpm_amphp', $config['runtime']);
+        $this->assertSame('swoole', $config['runtime']);
         $this->assertTrue($config['debug']);
         $this->assertSame(50, $config['jobs_log_limit']);
     }

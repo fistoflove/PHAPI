@@ -17,8 +17,7 @@ class SwooleHttpClient implements HttpClient
     public function getJson(string $url): array
     {
         if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
-            $fallback = new BlockingHttpClient();
-            return $fallback->getJson($url);
+            throw new HttpRequestException($url, 0, '', 'Swoole coroutine HTTP client is not available.');
         }
 
         $meta = $this->getJsonWithMeta($url);
@@ -40,8 +39,7 @@ class SwooleHttpClient implements HttpClient
     public function getJsonWithMeta(string $url): array
     {
         if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
-            $fallback = new BlockingHttpClient();
-            return $fallback->getJsonWithMeta($url);
+            throw new HttpRequestException($url, 0, '', 'Swoole coroutine HTTP client is not available.');
         }
 
         $parts = parse_url($url);

@@ -6,13 +6,12 @@ use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
-use PHPUnit\Framework\TestCase;
 
-class RequestContextParamsTest extends TestCase
+class RequestContextParamsTest extends SwooleTestCase
 {
     public function testParamsAvailableFromRequestContext(): void
     {
-        $api = new PHAPI(['runtime' => 'fpm']);
+        $api = new PHAPI(['runtime' => 'swoole']);
         $api->get('/bases/{id}', function (): Response {
             $request = PHAPI::request();
             return Response::json([

@@ -33,7 +33,7 @@ if (!$autoloadLoaded) {
     exit(1);
 }
 
-$runtime = getenv('APP_RUNTIME') ?: 'fpm';
+$runtime = getenv('APP_RUNTIME') ?: 'swoole';
 
 if ($runtime === 'portable_swoole') {
     if (!extension_loaded('swoole')) {

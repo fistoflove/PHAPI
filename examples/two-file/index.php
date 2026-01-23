@@ -10,7 +10,7 @@ if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
 }
 
 $config = [
-    'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
+    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,

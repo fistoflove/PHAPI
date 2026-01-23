@@ -5,18 +5,17 @@ declare(strict_types=1);
 namespace PHAPI\Tests;
 
 use PHAPI\Core\RuntimeManager;
-use PHAPI\Runtime\FpmDriver;
-use PHPUnit\Framework\TestCase;
+use PHAPI\Runtime\SwooleDriver;
 
-final class RuntimeManagerTest extends TestCase
+final class RuntimeManagerTest extends SwooleTestCase
 {
     public function testSelectsRuntimeDriver(): void
     {
-        $manager = new RuntimeManager(['runtime' => 'fpm']);
+        $manager = new RuntimeManager(['runtime' => 'swoole']);
 
-        $this->assertInstanceOf(FpmDriver::class, $manager->driver());
+        $this->assertInstanceOf(SwooleDriver::class, $manager->driver());
         $this->assertNotNull($manager->capabilities());
-        $this->assertSame('fpm', $manager->driver()->name());
-        $this->assertFalse($manager->driver()->isLongRunning());
+        $this->assertSame('swoole', $manager->driver()->name());
+        $this->assertTrue($manager->driver()->isLongRunning());
     }
 }

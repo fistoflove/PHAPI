@@ -6,7 +6,7 @@ use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 
 $api->get('/', function (): Response {
-    return Response::json(['message' => 'Multi-runtime example']);
+    return Response::json(['message' => 'Example app']);
 });
 
 $api->get('/status', [StatusController::class, 'show']);

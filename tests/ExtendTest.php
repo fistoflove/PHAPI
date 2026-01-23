@@ -6,13 +6,12 @@ namespace PHAPI\Tests;
 
 use PHAPI\Core\Container;
 use PHAPI\PHAPI;
-use PHPUnit\Framework\TestCase;
 
-final class ExtendTest extends TestCase
+final class ExtendTest extends SwooleTestCase
 {
     public function testExtendRegistersSingletonByDefault(): void
     {
-        $api = new PHAPI(['runtime' => 'fpm']);
+        $api = new PHAPI(['runtime' => 'swoole']);
 
         $api->extend('cache', function (Container $container): object {
             return new \stdClass();
@@ -26,7 +25,7 @@ final class ExtendTest extends TestCase
 
     public function testExtendCanRegisterTransient(): void
     {
-        $api = new PHAPI(['runtime' => 'fpm']);
+        $api = new PHAPI(['runtime' => 'swoole']);
 
         $api->extend('transient', function (Container $container): object {
             return new \stdClass();

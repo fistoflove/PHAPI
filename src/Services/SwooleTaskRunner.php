@@ -15,8 +15,7 @@ class SwooleTaskRunner implements TaskRunner
     public function parallel(array $tasks): array
     {
         if (!class_exists('Swoole\\Coroutine')) {
-            $runner = new SequentialTaskRunner();
-            return $runner->parallel($tasks);
+            throw new \RuntimeException('Swoole coroutines are not available.');
         }
 
         $results = [];
@@ -42,9 +41,7 @@ class SwooleTaskRunner implements TaskRunner
             }
 
             if (!class_exists('Swoole\\Coroutine\\Channel')) {
-                $runner = new SequentialTaskRunner();
-                $results = $runner->parallel($tasks);
-                return;
+                throw new \RuntimeException('Swoole coroutine channels are not available.');
             }
 
             $channel = new \Swoole\Coroutine\Channel(count($tasks));

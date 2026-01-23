@@ -1,12 +1,11 @@
 # PHAPI
 
-Micro MVC framework for PHP with a runtime-agnostic core. Write the same routes, middleware, auth, and jobs for PHP-FPM, FPM+AMPHP, or Swoole.
+Micro MVC framework for PHP built for Swoole. Write routes, middleware, auth, and jobs with a single Swoole runtime, including portable Swoole.
 
 ## Requirements
 
-- PHP 8.1+
-- Optional: Swoole extension for Swoole runtime
-- Optional: `amphp/amp` and `amphp/http-client` for AMPHP runtime
+- PHP 8.3+
+- Swoole extension (native or portable)
 
 ## Install
 
@@ -24,7 +23,7 @@ use PHAPI\PHAPI;
 use PHAPI\HTTP\Response;
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
+    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
@@ -95,11 +94,11 @@ $api->onWorkerStart(function ($server, int $workerId): void {
 });
 
 $api->onRequestStart(function (Request $request): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onRequestEnd(function (Request $request, Response $response): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onShutdown(function (): void {
@@ -109,15 +108,13 @@ $api->onShutdown(function (): void {
 
 Runtime hook semantics:
 
-| Hook | FPM | AMPHP | Swoole |
-| --- | --- | --- | --- |
-| `onRequestStart` | once per request | once per request | once per request |
-| `onRequestEnd` | once per request | once per request | once per request |
-| `onBoot` | no-op | no-op | once on server start |
-| `onWorkerStart` | no-op | no-op | once per worker |
-| `onShutdown` | no-op | no-op | once on server shutdown |
-
-PHAPI logs a warning in debug mode when `onWorkerStart()` is registered under FPM/AMPHP.
+| Hook | Swoole |
+| --- | --- |
+| `onRequestStart` | once per request |
+| `onRequestEnd` | once per request |
+| `onBoot` | once on server start |
+| `onWorkerStart` | once per worker |
+| `onShutdown` | once on server shutdown |
 Multiple `onWorkerStart()` handlers are supported; they run in registration order.
 
 ## Runtime Interface
@@ -125,7 +122,7 @@ Multiple `onWorkerStart()` handlers are supported; they run in registration orde
 ```php
 $runtime = $api->runtime();
 
-$runtime->name(); // fpm, fpm_amphp, swoole, portable_swoole
+$runtime->name(); // swoole or portable_swoole
 $runtime->supportsWebSockets();
 $runtime->isLongRunning();
 ```
@@ -229,25 +226,6 @@ $cache = $api->resolve('cache');
 
 Suggested naming to avoid collisions: `vendor.feature` or `feature.variant` (e.g., `metrics.prometheus`).
 
-## AMPHP Runtime Example
-
-```bash
-APP_RUNTIME=amphp php example.php
-```
-
-```php
-$api->get('/external', function (): Response {
-    try {
-        $data = PHAPI::app()?->http()->getJson('https://api.example.com/data');
-        return Response::json(['data' => $data]);
-    } catch (\PHAPI\Exceptions\HttpRequestException $e) {
-        return Response::error('Upstream error', 502, [
-            'status' => $e->status(),
-        ]);
-    }
-});
-```
-
 ## Swoole WebSocket Example
 
 ```php
@@ -311,10 +289,8 @@ If a job throws, the run is recorded as `error` and the message is logged.
 
 ## Runtime Selection
 
-- `APP_RUNTIME=fpm` (default)
-- `APP_RUNTIME=fpm_amphp` or `amphp`
-- `APP_RUNTIME=swoole`
-- `APP_RUNTIME=portable_swoole`
+- `APP_RUNTIME=swoole` (default)
+- `APP_RUNTIME=portable_swoole` (loads a bundled `swoole.so`)
 
 Swoole uses the native PHP extension only.
 
@@ -444,7 +420,7 @@ Named middleware:
 
 ## Jobs
 
-Jobs are scheduled in app code. In Swoole, they run automatically. In FPM/AMPHP, use cron with `bin/phapi-jobs`.
+Jobs are scheduled in app code and run automatically under Swoole.
 
 ```php
 $api->schedule('cleanup', 300, function () {
@@ -454,12 +430,6 @@ $api->schedule('cleanup', 300, function () {
     'log_enabled' => true,
     'lock_mode' => 'skip', // or 'block'
 ]);
-```
-
-Cron example:
-
-```bash
-* * * * * php /path/to/phapi/bin/phapi-jobs /path/to/app.php
 ```
 
 Job logs live under `var/jobs` by default and rotate by size.
@@ -499,8 +469,6 @@ $results = $api->tasks()->parallel([
 ]);
 ```
 
-- FPM: sequential
-- AMPHP: futures
 - Swoole: coroutines
 
 ## HTTP Client
@@ -528,7 +496,6 @@ $api->realtime()->broadcast('channel', ['event' => 'ping']);
 ```
 
 - Swoole: WebSocket broadcast
-- FPM/AMPHP: fallback/no-op (configure a fallback handler)
 
 ### WebSocket Subscriptions (Swoole)
 
@@ -622,23 +589,20 @@ examples/multi-file/
     tasks.php
 ```
 
-## Multi-Runtime Example App
+## Example App
 
 The full example lives at `examples/multi-runtime/app.php` and demonstrates:
 providers, DI/autowiring, class middleware, jobs, tasks, HTTP client, and
-WebSocket subscriptions (when running Swoole).
+WebSocket subscriptions.
 
 Run it with:
 
 ```bash
-# FPM (built-in server)
-APP_RUNTIME=fpm php -S 127.0.0.1:9503 examples/multi-runtime/app.php
-
-# AMPHP (built-in server)
-APP_RUNTIME=amphp php -S 127.0.0.1:9503 examples/multi-runtime/app.php
-
-# Swoole
+# Native Swoole
 APP_RUNTIME=swoole php examples/multi-runtime/app.php
+
+# Portable Swoole
+APP_RUNTIME=portable_swoole php bin/phapi-run examples/multi-runtime/app.php
 ```
 
 ## Examples
@@ -657,7 +621,7 @@ use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 
-$api = new PHAPI(['runtime' => 'fpm']);
+$api = new PHAPI(['runtime' => 'swoole']);
 
 $api->get('/hello', fn() => Response::json(['ok' => true]));
 

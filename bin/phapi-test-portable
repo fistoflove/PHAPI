@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+PHP_VERSION="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
+ARCH_DIR="linux-$(uname -m)"
+
+if [[ -n "${PHAPI_PORTABLE_SWOOLE_EXT:-}" ]]; then
+  SWOOLE_EXT="${PHAPI_PORTABLE_SWOOLE_EXT}"
+else
+  BASE_DIR="${PHAPI_PORTABLE_SWOOLE_DIR:-${ROOT_DIR}/portable-swoole}"
+  SWOOLE_EXT="${BASE_DIR}/bin/extensions/php${PHP_VERSION}/${ARCH_DIR}/swoole.so"
+fi
+
+if [[ ! -f "${SWOOLE_EXT}" ]]; then
+  echo "Error: portable Swoole extension not found at: ${SWOOLE_EXT}" >&2
+  echo "Set PHAPI_PORTABLE_SWOOLE_EXT or PHAPI_PORTABLE_SWOOLE_DIR to override." >&2
+  exit 1
+fi
+
+PHP_EXT_DIR="$(php -r 'echo ini_get("extension_dir");')"
+
+php -n \
+  -d extension_dir="${PHP_EXT_DIR}" \
+  -d extension=dom \
+  -d extension=mbstring \
+  -d extension=tokenizer \
+  -d extension=xml \
+  -d extension=xmlwriter \
+  -d extension="${SWOOLE_EXT}" \
+  "${ROOT_DIR}/vendor/bin/phpunit" --testdox "$@"

@@ -6,7 +6,7 @@ use PHAPI\PHAPI;
 use PHAPI\Core\Container;
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
+    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
@@ -48,10 +48,10 @@ $api->onWorkerStart(function ($server, int $workerId): void {
     // Worker hook (Swoole only).
 });
 $api->onRequestStart(function (\PHAPI\HTTP\Request $request): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 $api->onRequestEnd(function (\PHAPI\HTTP\Request $request, \PHAPI\HTTP\Response $response): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 $api->onShutdown(function (): void {
     // Shutdown hook (Swoole only).

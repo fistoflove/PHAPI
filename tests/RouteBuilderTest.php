@@ -4,13 +4,12 @@ namespace PHAPI\Tests;
 
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
-use PHPUnit\Framework\TestCase;
 
-class RouteBuilderTest extends TestCase
+class RouteBuilderTest extends SwooleTestCase
 {
     public function testValidateUpdatesRegisteredRoute(): void
     {
-        $api = new PHAPI(['runtime' => 'fpm']);
+        $api = new PHAPI(['runtime' => 'swoole']);
         $api->post('/register', function (): Response {
             return Response::json(['ok' => true]);
         })->validate([

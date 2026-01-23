@@ -1,22 +1,19 @@
-PHAPI Multi-Runtime Example
+PHAPI Example App
 
 What it demonstrates
 - Providers and DI/autowiring.
 - Class-based middleware.
 - Jobs and task runner.
 - HTTP client usage.
-- WebSocket subscriptions (when running Swoole).
+- WebSocket subscriptions.
 
 How to run
 
-FPM (built-in server):
-  APP_RUNTIME=fpm php -S 127.0.0.1:9503 examples/multi-runtime/app.php
-
-AMPHP (built-in server):
-  APP_RUNTIME=amphp php -S 127.0.0.1:9503 examples/multi-runtime/app.php
-
-Swoole:
+Native Swoole:
   APP_RUNTIME=swoole php examples/multi-runtime/app.php
+
+Portable Swoole:
+  APP_RUNTIME=portable_swoole php bin/phapi-run examples/multi-runtime/app.php
 
 Routes
 - GET /            -> basic status
@@ -31,8 +28,7 @@ WebSocket
 - Send: {"action":"subscribe","channel":"updates"}
 
 Background Process
-- Started via `spawnProcess()` before `run()` when running Swoole.
+- Started via `spawnProcess()` before `run()`.
 
 Jobs
-- In FPM/AMPHP, run jobs with:
-  php bin/phapi-jobs examples/multi-runtime/app.php
+- Jobs run automatically under Swoole.

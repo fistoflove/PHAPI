@@ -37,7 +37,7 @@ final class ConfigLoader
         $debugEnv = getenv('APP_DEBUG');
 
         $defaults['runtime'] = ($runtimeEnv === false || $runtimeEnv === '')
-            ? ($defaults['runtime'] ?? 'fpm')
+            ? ($defaults['runtime'] ?? 'swoole')
             : $runtimeEnv;
         $defaults['debug'] = ($debugEnv !== false && $debugEnv !== '');
 

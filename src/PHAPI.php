@@ -25,13 +25,9 @@ use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
 use PHAPI\Server\Router;
-use PHAPI\Services\AmpHttpClient;
-use PHAPI\Services\AmpTaskRunner;
-use PHAPI\Services\BlockingHttpClient;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\Realtime;
-use PHAPI\Services\SequentialTaskRunner;
 use PHAPI\Services\SwooleHttpClient;
 use PHAPI\Services\SwooleTaskRunner;
 use PHAPI\Services\TaskRunner;
@@ -1017,12 +1013,7 @@ final class PHAPI
         if ($driver instanceof SwooleDriver) {
             return new SwooleTaskRunner();
         }
-
-        if ($this->runtimeManager->capabilities()->supportsAsyncIo()) {
-            return new AmpTaskRunner();
-        }
-
-        return new SequentialTaskRunner();
+        throw new FeatureNotSupportedException('Task runner requires Swoole runtime.');
     }
 
     private function resolveHttpClient(): HttpClient
@@ -1031,12 +1022,7 @@ final class PHAPI
         if ($driver instanceof SwooleDriver) {
             return new SwooleHttpClient();
         }
-
-        if ($this->runtimeManager->capabilities()->supportsAsyncIo()) {
-            return new AmpHttpClient();
-        }
-
-        return new BlockingHttpClient();
+        throw new FeatureNotSupportedException('HTTP client requires Swoole runtime.');
     }
 
 }

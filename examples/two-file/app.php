@@ -45,11 +45,11 @@ $api->onWorkerStart(function ($server, int $workerId): void {
 });
 
 $api->onRequestStart(function (Request $request): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onRequestEnd(function (Request $request, Response $response): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onShutdown(function (): void {

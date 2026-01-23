@@ -31,7 +31,7 @@ final class ExampleMiddleware
 }
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'fpm',
+    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,

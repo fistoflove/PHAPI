@@ -16,4 +16,4 @@ public/
 ## Notes
 - `routes/` can be loaded via `PHAPI::loadApp()` or included directly.
 - `config/` is optional; PHAPI reads defaults from `config/phapi.php` when present.
-- `var/` is a good place for runtime logs, SQLite files, and job logs.
+- `var/` is a good place for runtime logs and job logs.

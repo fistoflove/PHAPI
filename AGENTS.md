@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 - `src/` contains the framework runtime, HTTP stack, services, and contracts.
 - `tests/` contains PHPUnit tests (unit and integration).
-- `examples/` includes runnable examples (single-file, multi-file, multi-runtime).
+- `examples/` includes runnable examples (single-file, multi-file, example app).
 - `config/` holds default configuration (`config/phapi.php`).
 - `docs/` stores staged implementation notes and supporting docs.
 - `bin/` provides CLI helpers (`phapi-run`, `phapi-jobs`).
@@ -16,11 +16,11 @@
 - `composer lint:fix`: Apply PHP-CS-Fixer formatting.
 
 Examples:
-- `APP_RUNTIME=fpm php -S 127.0.0.1:9503 example.php`
 - `APP_RUNTIME=swoole php example.php`
+- `APP_RUNTIME=portable_swoole php bin/phapi-run example.php`
 
 ## Coding Style & Naming Conventions
-- PHP 8.1+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
+- PHP 8.3+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
 - Use meaningful, descriptive class names; prefer `PascalCase` for classes and `camelCase` for methods.
 - Formatting is enforced via PHP-CS-Fixer (`.php-cs-fixer.php`).
 - Static analysis via PHPStan (`phpstan.neon`, strict rules).
@@ -38,5 +38,5 @@ Examples:
 - Update `README.md` whenever a change affects usage, configuration, public APIs, or examples.
 
 ## Security & Configuration Tips
-- Runtime selection uses `APP_RUNTIME` (`fpm`, `fpm_amphp`, `swoole`, `portable_swoole`).
+- Runtime selection uses `APP_RUNTIME` (`swoole`, `portable_swoole`).
 - Use `PHAPI_PORTABLE_SWOOLE_DIR` or `PHAPI_PORTABLE_SWOOLE_EXT` when testing portable Swoole.

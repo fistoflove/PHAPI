@@ -43,7 +43,7 @@ class FallbackRealtime implements Realtime
 
         if ($this->debug) {
             throw new FeatureNotSupportedException(
-                'WebSockets are not supported by the current runtime. Use the Swoole runtime or configure a polling fallback.'
+                'WebSockets are not enabled. Enable WebSockets or configure a polling fallback.'
             );
         }
     }
