@@ -97,6 +97,10 @@ class Client
     public function set(array $settings): void
     {
     }
+    public function post(string $path, string $data): bool
+    {
+        return true;
+    }
     public function get(string $path): bool
     {
         return true;

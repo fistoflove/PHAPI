@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHAPI\Database;
 
-use PDOException;
 
 /**
  * Database Schema Management
@@ -75,11 +74,8 @@ class Schema
         try {
             $db = ConnectionManager::getConnection();
             $result = $db->query("SELECT name FROM sqlite_master WHERE type='table' AND name='options'");
-            if ($result === false) {
-                return false;
-            }
             return $result->rowCount() > 0;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }

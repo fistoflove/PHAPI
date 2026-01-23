@@ -572,8 +572,19 @@ You can opt in to SQLite via `config/phapi.php`:
 
 ```php
 'database' => [
+    'driver' => 'sqlite',
     'path' => getcwd() . '/var/app.sqlite',
     'options' => [],
+],
+```
+
+Turso (Swoole only):
+
+```php
+'database' => [
+    'driver' => 'turso',
+    'turso_url' => 'https://your-db.turso.io',
+    'turso_token' => 'token',
 ],
 ```
 

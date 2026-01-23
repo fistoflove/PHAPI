@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHAPI\Database;
 
-use PDOException;
 
 /**
  * Options Facade - WordPress-style key-value storage
@@ -51,7 +50,7 @@ class Options
         try {
             $db = ConnectionManager::getConnection();
             $stmt = $db->query("SELECT key, value FROM options WHERE autoload = 1 AND (expires_at IS NULL OR expires_at > datetime('now'))");
-            $options = $stmt === false ? [] : $stmt->fetchAll();
+            $options = $stmt->fetchAll();
 
             self::$cache = [];
             foreach ($options as $option) {
@@ -59,7 +58,7 @@ class Options
             }
 
             self::$cacheLoaded = true;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             // If table doesn't exist yet, start with empty cache
             self::$cache = [];
             self::$cacheLoaded = true;
@@ -88,7 +87,7 @@ class Options
             $stmt->execute([$key]);
             $option = $stmt->fetch();
 
-            if ($option === false || $option === null) {
+            if ($option === false) {
                 return $default;
             }
 
@@ -111,7 +110,7 @@ class Options
             }
 
             return $value ?? $default;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return $default;
         }
     }
@@ -171,7 +170,7 @@ class Options
             }
 
             return $result;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -196,7 +195,7 @@ class Options
             $stmt = $db->prepare("SELECT 1 FROM options WHERE key = ? AND (expires_at IS NULL OR expires_at > datetime('now'))");
             $stmt->execute([$key]);
             return $stmt->fetch() !== false;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -222,7 +221,7 @@ class Options
             }
 
             return $result;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }
@@ -254,7 +253,7 @@ class Options
             }
 
             return $count;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return 0;
         }
     }
@@ -281,7 +280,7 @@ class Options
             }
 
             return $result;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return [];
         }
     }
@@ -332,7 +331,7 @@ class Options
             }
 
             return $result;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return $result;
         }
     }
@@ -348,8 +347,7 @@ class Options
 
         try {
             $db = ConnectionManager::getConnection();
-            $stmt = $db->exec("DELETE FROM options WHERE expires_at IS NOT NULL AND expires_at < datetime('now')");
-            $deleted = $stmt === false ? 0 : $stmt;
+            $deleted = $db->exec("DELETE FROM options WHERE expires_at IS NOT NULL AND expires_at < datetime('now')");
 
             // Clear cache if expired options were deleted
             if (self::$cacheLoaded && $deleted > 0) {
@@ -359,7 +357,7 @@ class Options
             }
 
             return $deleted;
-        } catch (PDOException $e) {
+        } catch (\Throwable $e) {
             return 0;
         }
     }

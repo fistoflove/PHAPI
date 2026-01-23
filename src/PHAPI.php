@@ -15,12 +15,12 @@ use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
+use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
 use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\SwooleDriver;
-use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
@@ -121,7 +121,7 @@ final class PHAPI
         $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
         $this->providerLoader->boot($this->providers, $this);
         $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
-        $this->bootstrapper->configureDatabase($this->config);
+        $this->bootstrapper->configureDatabase($this->config, $this->runtimeManager->driver());
         $this->defaultEndpoints->register($this, $this->jobs, $this->config);
     }
 

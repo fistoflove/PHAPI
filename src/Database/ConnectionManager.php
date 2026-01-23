@@ -9,16 +9,19 @@ use PDOException;
 
 /**
  * Database Connection Manager
- * Handles SQLite connections with Swoole-optimized pooling
+ * Handles SQLite and Turso connections with Swoole-optimized pooling
  */
 class ConnectionManager
 {
-    private static ?PDO $connection = null;
+    private static ?DatabaseConnectionInterface $connection = null;
     /**
-     * @var array<int, PDO>
+     * @var array<int, DatabaseConnectionInterface>
      */
     private static array $workerConnections = [];
     private static ?string $dbPath = null;
+    private static ?string $driver = null;
+    private static ?string $tursoUrl = null;
+    private static ?string $tursoToken = null;
     /**
      * @var array<string, mixed>
      */
@@ -33,25 +36,74 @@ class ConnectionManager
      */
     public static function configure(string $dbPath, array $options = []): void
     {
+        self::configureSqlite($dbPath, $options);
+    }
+
+    /**
+     * Configure SQLite driver.
+     *
+     * @param string $dbPath
+     * @param array<string, mixed> $options
+     * @return void
+     */
+    public static function configureSqlite(string $dbPath, array $options = []): void
+    {
+        self::$driver = 'sqlite';
         self::$dbPath = $dbPath;
+        self::$tursoUrl = null;
+        self::$tursoToken = null;
         self::$config = array_merge([
             'readonly' => false,
             'wal_mode' => true,
             'timeout' => 5000,
             'busy_timeout' => 30000,
         ], $options);
+        self::closeAll();
+    }
+
+    /**
+     * Configure Turso driver (Swoole only).
+     *
+     * @param string $url
+     * @param string $token
+     * @param array<string, mixed> $options
+     * @return void
+     */
+    public static function configureTurso(string $url, string $token, array $options = []): void
+    {
+        self::$driver = 'turso';
+        self::$dbPath = null;
+        self::$tursoUrl = $url;
+        self::$tursoToken = $token;
+        self::$config = $options;
+        self::closeAll();
     }
 
     /**
      * Get database connection (creates if needed)
      *
-     * @return PDO
+     * @return DatabaseConnectionInterface
      * @throws \RuntimeException
      */
-    public static function getConnection(): PDO
+    public static function getConnection(): DatabaseConnectionInterface
     {
-        if (self::$dbPath === null) {
+        if (self::$driver === null) {
             throw new \RuntimeException('Database not configured. Call configureDatabase() first.');
+        }
+
+        if (self::$driver === 'turso') {
+            if (self::$tursoUrl === null || self::$tursoToken === null) {
+                throw new \RuntimeException('Turso is not configured.');
+            }
+
+            $workerId = extension_loaded('swoole') ? \Swoole\Coroutine::getCid() : 0;
+            if (isset(self::$workerConnections[$workerId])) {
+                return self::$workerConnections[$workerId];
+            }
+
+            $connection = new TursoConnection(self::$tursoUrl, self::$tursoToken);
+            self::$workerConnections[$workerId] = $connection;
+            return $connection;
         }
 
         // Use worker ID for connection pooling in Swoole
@@ -84,7 +136,7 @@ class ConnectionManager
      */
     public static function isConfigured(): bool
     {
-        return self::$dbPath !== null;
+        return self::$driver !== null;
     }
 
     /**
@@ -100,10 +152,10 @@ class ConnectionManager
     /**
      * Create a new database connection
      *
-     * @return PDO
+     * @return DatabaseConnectionInterface
      * @throws \RuntimeException
      */
-    private static function createConnection(): PDO
+    private static function createConnection(): DatabaseConnectionInterface
     {
         if (self::$dbPath === null || self::$dbPath === '') {
             throw new \RuntimeException('Database path is not configured.');
@@ -149,7 +201,7 @@ class ConnectionManager
                 $connection->exec('PRAGMA synchronous=NORMAL;');
             }
 
-            return $connection;
+            return new SqliteConnection($connection);
         } catch (PDOException $e) {
             throw new \RuntimeException('Failed to connect to database: ' . $e->getMessage());
         }

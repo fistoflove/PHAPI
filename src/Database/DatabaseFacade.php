@@ -38,7 +38,21 @@ class DatabaseFacade
 
         $config = array_merge($defaultOptions, $options);
 
-        ConnectionManager::configure($dbPath, $config);
+        ConnectionManager::configureSqlite($dbPath, $config);
+        Schema::initialize();
+    }
+
+    /**
+     * Configure Turso connection (Swoole only).
+     *
+     * @param string $url
+     * @param string $token
+     * @param array<string, mixed> $options
+     * @return void
+     */
+    public static function configureTurso(string $url, string $token, array $options = []): void
+    {
+        ConnectionManager::configureTurso($url, $token, $options);
         Schema::initialize();
     }
 
@@ -47,9 +61,9 @@ class DatabaseFacade
      *
      * Returns PDO instance if database is configured, null otherwise.
      *
-     * @return \PDO|null
+     * @return DatabaseConnectionInterface|null
      */
-    public static function getConnection(): ?\PDO
+    public static function getConnection(): ?DatabaseConnectionInterface
     {
         if (!ConnectionManager::isConfigured()) {
             return null;
