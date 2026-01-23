@@ -4,7 +4,6 @@ require __DIR__ . '/vendor/autoload.php';
 
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
-use PHAPI\Database\DatabaseFacade;
 use PHAPI\Core\Container;
 use PHAPI\HTTP\Request;
 
@@ -152,21 +151,6 @@ $api->post('/process', function (): Response {
         'results' => $results,
     ], 202);
 });
-
-$api->schedule('log_ping', 10, function () {
-    $db = DatabaseFacade::getConnection();
-    if ($db === null) {
-        return;
-    }
-
-    $db->exec("CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, message TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT (datetime('now')))");
-    $stmt = $db->prepare("INSERT INTO logs (message, created_at) VALUES (?, datetime('now'))");
-    $stmt->execute(['heartbeat']);
-}, [
-    'log_file' => 'log-ping-job.log',
-    'log_enabled' => true,
-    'lock_mode' => 'skip',
-]);
 
 $api->get('/jobs', function (): Response {
     $app = PHAPI::app();

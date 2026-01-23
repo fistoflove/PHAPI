@@ -121,7 +121,6 @@ final class PHAPI
         $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
         $this->providerLoader->boot($this->providers, $this);
         $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
-        $this->bootstrapper->configureDatabase($this->config, $this->runtimeManager->driver());
         $this->defaultEndpoints->register($this, $this->jobs, $this->config);
     }
 

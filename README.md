@@ -558,36 +558,6 @@ $api->realtime()->broadcast('player:123', ['event' => 'ping']);
 The `$driver` argument is the active Swoole runtime driver. Authenticate WebSocket
 connections and validate subscription messages before joining channels.
 
-## SQLite Helpers
-
-```php
-use PHAPI\Database\DatabaseFacade;
-
-DatabaseFacade::configure(__DIR__ . '/var/app.sqlite');
-DatabaseFacade::setOption('site_name', 'My App');
-$value = DatabaseFacade::option('site_name');
-```
-
-You can opt in to SQLite via `config/phapi.php`:
-
-```php
-'database' => [
-    'driver' => 'sqlite',
-    'path' => getcwd() . '/var/app.sqlite',
-    'options' => [],
-],
-```
-
-Turso (Swoole only):
-
-```php
-'database' => [
-    'driver' => 'turso',
-    'turso_url' => 'https://your-db.turso.io',
-    'turso_token' => 'token',
-],
-```
-
 ## Request Context Helpers
 
 Handlers can be `function (): Response` and access context statically:

@@ -16,5 +16,4 @@ return [
     'jobs_log_limit' => 200,
     'jobs_log_rotate_bytes' => 1048576,
     'jobs_log_rotate_keep' => 5,
-    'database' => null,
 ];
