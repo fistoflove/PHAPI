@@ -50,6 +50,35 @@ $api->get('/plugin', function(): Response {
     return Response::json(['message' => $message]);
 });
 
+$api->get('/redis', function(): Response {
+    $redis = PHAPI::app()?->redis();
+    if ($redis === null) {
+        return Response::error('Redis client unavailable', 500);
+    }
+
+    try {
+        $redis->set('phapi:hello', 'world', 30);
+        $value = $redis->get('phapi:hello');
+        return Response::json(['value' => $value]);
+    } catch (\Throwable $e) {
+        return Response::error('Redis error', 500, ['message' => $e->getMessage()]);
+    }
+});
+
+$api->get('/mysql', function(): Response {
+    $mysql = PHAPI::app()?->mysql();
+    if ($mysql === null) {
+        return Response::error('MySQL client unavailable', 500);
+    }
+
+    try {
+        $rows = $mysql->query('SELECT 1 AS ok');
+        return Response::json(['rows' => $rows]);
+    } catch (\Throwable $e) {
+        return Response::error('MySQL error', 500, ['message' => $e->getMessage()]);
+    }
+});
+
 $api->get('/jobs', function(): Response {
     $app = PHAPI::app();
     return Response::json(['jobs' => $app?->jobLogs() ?? []]);

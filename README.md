@@ -485,6 +485,48 @@ $api->container()->singleton(\PHAPI\Services\HttpClient::class, MyHttpClient::cl
 
 Errors thrown by `getJson()` include HTTP status and raw body via `HttpRequestException`.
 
+## Redis (Swoole Coroutine)
+
+```php
+$redis = $api->redis();
+$redis->set('greeting', 'hello', 30);
+$value = $redis->get('greeting');
+```
+
+Config:
+
+```php
+'redis' => [
+    'host' => '127.0.0.1',
+    'port' => 6379,
+    'auth' => null,
+    'db' => null,
+    'timeout' => 1.0,
+],
+```
+
+## MySQL (Swoole Coroutine)
+
+```php
+$mysql = $api->mysql();
+$rows = $mysql->query('SELECT 1 AS ok');
+$mysql->execute('INSERT INTO users(name) VALUES (?)', ['Ada']);
+```
+
+Config:
+
+```php
+'mysql' => [
+    'host' => '127.0.0.1',
+    'port' => 3306,
+    'user' => 'root',
+    'password' => '',
+    'database' => '',
+    'charset' => 'utf8mb4',
+    'timeout' => 1.0,
+],
+```
+
 ## Error Responses
 
 `Response::error()` returns a JSON payload with `error` plus any extra fields you pass.

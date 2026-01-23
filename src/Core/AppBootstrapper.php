@@ -15,6 +15,8 @@ use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\RealtimeManager;
+use PHAPI\Services\SwooleMySqlClient;
+use PHAPI\Services\SwooleRedisClient;
 use PHAPI\Services\TaskRunner;
 
 final class AppBootstrapper
@@ -62,6 +64,12 @@ final class AppBootstrapper
         $container->set(HttpClient::class, $httpClient);
         $container->set(AuthManager::class, $auth);
         $container->set('auth', $auth);
+        $container->singleton(SwooleRedisClient::class, static function () use ($app) {
+            return $app->redis();
+        });
+        $container->singleton(SwooleMySqlClient::class, static function () use ($app) {
+            return $app->mysql();
+        });
 
         $this->authConfigurator->registerMiddleware($middleware, $auth);
 

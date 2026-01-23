@@ -21,6 +21,8 @@ Routes
 - GET /tasks       -> task runner sample
 - GET /fetch       -> HTTP client request
 - GET /broadcast   -> realtime broadcast
+- GET /redis       -> Redis coroutine sample
+- GET /mysql       -> MySQL coroutine sample
 - GET /jobs        -> job logs
 
 WebSocket

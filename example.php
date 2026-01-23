@@ -58,6 +58,22 @@ $api = new PHAPI([
         },
         'session_key' => 'user',
     ],
+    'redis' => [
+        'host' => getenv('REDIS_HOST') ?: '127.0.0.1',
+        'port' => (int)(getenv('REDIS_PORT') ?: 6379),
+        'auth' => getenv('REDIS_AUTH') ?: null,
+        'db' => getenv('REDIS_DB') !== false ? (int)getenv('REDIS_DB') : null,
+        'timeout' => getenv('REDIS_TIMEOUT') !== false ? (float)getenv('REDIS_TIMEOUT') : 1.0,
+    ],
+    'mysql' => [
+        'host' => getenv('MYSQL_HOST') ?: '127.0.0.1',
+        'port' => (int)(getenv('MYSQL_PORT') ?: 3306),
+        'user' => getenv('MYSQL_USER') ?: 'root',
+        'password' => getenv('MYSQL_PASSWORD') ?: '',
+        'database' => getenv('MYSQL_DATABASE') ?: '',
+        'charset' => getenv('MYSQL_CHARSET') ?: 'utf8mb4',
+        'timeout' => getenv('MYSQL_TIMEOUT') !== false ? (float)getenv('MYSQL_TIMEOUT') : 1.0,
+    ],
 ]);
 
 // Security headers middleware (basic defaults)
@@ -78,11 +94,11 @@ $api->onWorkerStart(function ($server, int $workerId): void {
 });
 
 $api->onRequestStart(function (\PHAPI\HTTP\Request $request): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onRequestEnd(function (\PHAPI\HTTP\Request $request, Response $response): void {
-    // Request hook (all runtimes).
+    // Request hook.
 });
 
 $api->onShutdown(function (): void {
@@ -130,6 +146,35 @@ $api->get('/info', [ExampleStatusController::class, 'show']);
 $api->get('/plugin', function (): Response {
     $message = PHAPI::app()?->resolve('greeting');
     return Response::json(['message' => $message]);
+});
+
+$api->get('/redis', function (): Response {
+    $redis = PHAPI::app()?->redis();
+    if ($redis === null) {
+        return Response::error('Redis client unavailable', 500);
+    }
+
+    try {
+        $redis->set('phapi:hello', 'world', 30);
+        $value = $redis->get('phapi:hello');
+        return Response::json(['value' => $value]);
+    } catch (\Throwable $e) {
+        return Response::error('Redis error', 500, ['message' => $e->getMessage()]);
+    }
+});
+
+$api->get('/mysql', function (): Response {
+    $mysql = PHAPI::app()?->mysql();
+    if ($mysql === null) {
+        return Response::error('MySQL client unavailable', 500);
+    }
+
+    try {
+        $rows = $mysql->query('SELECT 1 AS ok');
+        return Response::json(['rows' => $rows]);
+    } catch (\Throwable $e) {
+        return Response::error('MySQL error', 500, ['message' => $e->getMessage()]);
+    }
 });
 
 $api->post('/process', function (): Response {

@@ -84,6 +84,71 @@ class System
     }
 }
 
+class Redis
+{
+    public bool $connected = false;
+    public string $errMsg = '';
+
+    public function connect(string $host, int $port = 6379, float $timeout = 0.0): bool
+    {
+        return true;
+    }
+    public function auth(string $password): bool
+    {
+        return true;
+    }
+    public function select(int $db): bool
+    {
+        return true;
+    }
+    public function get(string $key): mixed
+    {
+        return null;
+    }
+    public function set(string $key, string $value): bool
+    {
+        return true;
+    }
+    public function setEx(string $key, int $ttl, string $value): bool
+    {
+        return true;
+    }
+    /** @param array<int, string> $keys */
+    public function del(array $keys): int
+    {
+        return 0;
+    }
+    /** @param array<int, string> $keys */
+    public function exists(array $keys): int
+    {
+        return 0;
+    }
+    public function rawCommand(string $command, mixed ...$args): mixed
+    {
+        return null;
+    }
+}
+
+class MySQL
+{
+    public bool $connected = false;
+    public string $connect_error = '';
+
+    /** @param array<string, mixed> $config */
+    public function connect(array $config): bool
+    {
+        return true;
+    }
+    public function query(string $sql): mixed
+    {
+        return null;
+    }
+    public function prepare(string $sql): mixed
+    {
+        return null;
+    }
+}
+
 namespace Swoole\Coroutine\Http;
 
 class Client
