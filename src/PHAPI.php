@@ -20,6 +20,7 @@ use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
 use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\SwooleDriver;
+use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
@@ -301,6 +302,27 @@ final class PHAPI
     public function runtime(): \PHAPI\Runtime\RuntimeInterface
     {
         return $this->runtimeManager->driver();
+    }
+
+    /**
+     * Register a background process factory (Swoole only).
+     *
+     * @param callable(): mixed $factory
+     * @param (callable(\Swoole\Process): void)|null $onStart
+     * @param int $workerId
+     * @return self
+     *
+     * @throws FeatureNotSupportedException
+     */
+    public function spawnProcess(callable $factory, ?callable $onStart = null, int $workerId = 0): self
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof SwooleDriver) {
+            throw new FeatureNotSupportedException('Background processes are supported only in Swoole runtime.');
+        }
+
+        $driver->spawnProcess($factory, $onStart, $workerId);
+        return $this;
     }
 
     /**

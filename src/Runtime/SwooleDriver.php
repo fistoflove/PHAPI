@@ -17,14 +17,19 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     private string $runtimeName;
     private Capabilities $capabilities;
     private ?\Swoole\Server $server = null;
+    private bool $started = false;
     /**
      * @var array<int, array{channels: array<string, bool>}>
      */
     private array $connections = [];
     /**
-     * @var callable(\Swoole\Server, int): void|null
+     * @var array<int, callable(\Swoole\Server, int): void>
      */
-    private $onWorkerStart = null;
+    private array $onWorkerStartHandlers = [];
+    /**
+     * @var array<int, array<int, array{factory: callable(): mixed, on_start: (callable(\Swoole\Process): void)|null}>>
+     */
+    private array $processFactoriesByWorker = [];
     /**
      * @var callable(): void|null
      */
@@ -100,6 +105,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      */
     public function start(HttpKernel $kernel): void
     {
+        $this->started = true;
         if ($this->onBoot !== null) {
             ($this->onBoot)();
         }
@@ -122,10 +128,13 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
                 }
             });
 
-            if ($this->onWorkerStart !== null) {
-                $handler = $this->onWorkerStart;
-                $server->on('workerStart', function ($server, int $workerId) use ($handler) {
-                    $handler($server, $workerId);
+            if ($this->onWorkerStartHandlers !== []) {
+                $handlers = $this->onWorkerStartHandlers;
+                $server->on('workerStart', function ($server, int $workerId) use ($handlers) {
+                    foreach ($handlers as $handler) {
+                        $handler($server, $workerId);
+                    }
+                    $this->startProcessesForWorker($workerId);
                 });
             }
 
@@ -155,10 +164,13 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         $server = new \Swoole\Http\Server($this->host, $this->port);
         $this->server = $server;
 
-        if ($this->onWorkerStart !== null) {
-            $handler = $this->onWorkerStart;
-            $server->on('workerStart', function ($server, int $workerId) use ($handler) {
-                $handler($server, $workerId);
+        if ($this->onWorkerStartHandlers !== []) {
+            $handlers = $this->onWorkerStartHandlers;
+            $server->on('workerStart', function ($server, int $workerId) use ($handlers) {
+                foreach ($handlers as $handler) {
+                    $handler($server, $workerId);
+                }
+                $this->startProcessesForWorker($workerId);
             });
         }
 
@@ -225,7 +237,27 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      */
     public function onWorkerStart(callable $handler): void
     {
-        $this->onWorkerStart = $handler;
+        $this->onWorkerStartHandlers[] = $handler;
+    }
+
+    /**
+     * Register a background process factory for a worker.
+     *
+     * @param callable(): mixed $factory
+     * @param (callable(\Swoole\Process): void)|null $onStart
+     * @param int $workerId
+     * @return void
+     */
+    public function spawnProcess(callable $factory, ?callable $onStart = null, int $workerId = 0): void
+    {
+        if ($this->started) {
+            throw new \RuntimeException('spawnProcess must be registered before the Swoole server starts.');
+        }
+
+        $this->processFactoriesByWorker[$workerId][] = [
+            'factory' => $factory,
+            'on_start' => $onStart,
+        ];
     }
 
     /**
@@ -302,6 +334,21 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             return;
         }
         unset($this->connections[$fd]['channels'][$channel]);
+    }
+
+    private function startProcessesForWorker(int $workerId): void
+    {
+        $entries = $this->processFactoriesByWorker[$workerId] ?? [];
+        foreach ($entries as $entry) {
+            $process = $entry['factory']();
+            if (!$process instanceof \Swoole\Process) {
+                throw new \RuntimeException('spawnProcess factory must return a Swoole\\Process instance.');
+            }
+            $process->start();
+            if ($entry['on_start'] !== null) {
+                ($entry['on_start'])($process);
+            }
+        }
     }
 
     /**

@@ -54,6 +54,18 @@ $api->onShutdown(function (): void {
 
 $runtime = $api->runtime();
 if ($runtime->supportsWebSockets() && $runtime instanceof SwooleDriver) {
+    $api->spawnProcess(function () {
+        return new \Swoole\Process(function ($process) {
+            while (true) {
+                $process->read();
+            }
+        }, false, SOCK_STREAM, true);
+    }, function (\Swoole\Process $process): void {
+        \Swoole\Event::add($process->pipe, function () use ($process) {
+            $process->read();
+        });
+    });
+
     $api->setWebSocketHandler(function ($server, $frame, $driver): void {
         $payload = json_decode($frame->data ?? '', true);
         if (!is_array($payload)) {

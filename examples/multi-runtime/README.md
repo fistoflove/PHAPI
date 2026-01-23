@@ -30,6 +30,9 @@ WebSocket
 - Connect to ws://127.0.0.1:9503
 - Send: {"action":"subscribe","channel":"updates"}
 
+Background Process
+- Started via `spawnProcess()` before `run()` when running Swoole.
+
 Jobs
 - In FPM/AMPHP, run jobs with:
   php bin/phapi-jobs examples/multi-runtime/app.php

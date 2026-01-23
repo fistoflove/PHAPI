@@ -118,6 +118,7 @@ Runtime hook semantics:
 | `onShutdown` | no-op | no-op | once on server shutdown |
 
 PHAPI logs a warning in debug mode when `onWorkerStart()` is registered under FPM/AMPHP.
+Multiple `onWorkerStart()` handlers are supported; they run in registration order.
 
 ## Runtime Interface
 
@@ -462,6 +463,24 @@ Cron example:
 ```
 
 Job logs live under `var/jobs` by default and rotate by size.
+
+## Background Processes (Swoole)
+
+Register processes before `run()` to start in worker 0 (outside coroutines):
+
+```php
+$api->spawnProcess(function () {
+    return new \Swoole\Process(function ($process) {
+        while (true) {
+            $process->read();
+        }
+    }, false, SOCK_STREAM, true);
+}, function (\Swoole\Process $process): void {
+    \Swoole\Event::add($process->pipe, function () use ($process) {
+        $process->read();
+    });
+});
+```
 
 ## Job Logs Endpoint
 
