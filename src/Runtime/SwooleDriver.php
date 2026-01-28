@@ -336,19 +336,15 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         unset($this->connections[$fd]['channels'][$channel]);
     }
 
-    private function startProcessesForWorker(int $workerId): void
+    protected function startProcessesForWorker(int $workerId): void
     {
-        if (class_exists('Swoole\\Coroutine') && \Swoole\Coroutine::getCid() >= 0) {
+        if ($this->coroutineId() >= 0) {
             if (!class_exists('Swoole\\Timer')) {
-                throw new \RuntimeException('Swoole timer is required to spawn processes outside coroutines.');
+                $this->logProcessDeferralError('Swoole timer is required to spawn processes outside coroutines.');
+                return;
             }
-            \Swoole\Timer::after(0, function () use ($workerId): void {
-                try {
-                    $this->startProcessesForWorkerOutsideCoroutine($workerId);
-                } catch (\Throwable $e) {
-                    error_log('PHAPI: failed to spawn process: ' . $e->getMessage());
-                    throw $e;
-                }
+            $this->deferTimer(function () use ($workerId): void {
+                $this->deferStartProcessesForWorker($workerId, 0);
             });
             return;
         }
@@ -356,7 +352,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         $this->startProcessesForWorkerOutsideCoroutine($workerId);
     }
 
-    private function startProcessesForWorkerOutsideCoroutine(int $workerId): void
+    protected function startProcessesForWorkerOutsideCoroutine(int $workerId): void
     {
         $entries = $this->processFactoriesByWorker[$workerId] ?? [];
         foreach ($entries as $entry) {
@@ -369,6 +365,51 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
                 ($entry['on_start'])($process);
             }
         }
+    }
+
+    private function deferStartProcessesForWorker(int $workerId, int $attempt): void
+    {
+        if ($this->coroutineId() < 0) {
+            $this->startProcessesForWorkerOutsideCoroutine($workerId);
+            return;
+        }
+
+        if (!class_exists('Swoole\\Event')) {
+            $this->logProcessDeferralError('Swoole event loop is required to spawn processes outside coroutines.');
+            return;
+        }
+
+        if ($attempt >= 100) {
+            $this->logProcessDeferralError('Unable to spawn processes outside coroutine context after multiple attempts.');
+            return;
+        }
+
+        $this->deferEvent(function () use ($workerId, $attempt): void {
+            $this->deferStartProcessesForWorker($workerId, $attempt + 1);
+        });
+    }
+
+    protected function coroutineId(): int
+    {
+        if (!class_exists('Swoole\\Coroutine')) {
+            return -1;
+        }
+        return \Swoole\Coroutine::getCid();
+    }
+
+    protected function deferTimer(callable $callback): void
+    {
+        \Swoole\Timer::after(0, $callback);
+    }
+
+    protected function deferEvent(callable $callback): void
+    {
+        \Swoole\Event::defer($callback);
+    }
+
+    protected function logProcessDeferralError(string $message): void
+    {
+        error_log('PHAPI: ' . $message);
     }
 
     /**
