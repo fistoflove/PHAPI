@@ -467,6 +467,8 @@ $api->spawnProcess(function () {
 });
 ```
 
+Portable Swoole may invoke worker-start hooks inside a coroutine; PHAPI defers process start to a timer so it runs outside coroutines.
+
 ## Job Logs Endpoint
 
 ```php

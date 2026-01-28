@@ -338,6 +338,26 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
     private function startProcessesForWorker(int $workerId): void
     {
+        if (class_exists('Swoole\\Coroutine') && \Swoole\Coroutine::getCid() >= 0) {
+            if (!class_exists('Swoole\\Timer')) {
+                throw new \RuntimeException('Swoole timer is required to spawn processes outside coroutines.');
+            }
+            \Swoole\Timer::after(0, function () use ($workerId): void {
+                try {
+                    $this->startProcessesForWorkerOutsideCoroutine($workerId);
+                } catch (\Throwable $e) {
+                    error_log('PHAPI: failed to spawn process: ' . $e->getMessage());
+                    throw $e;
+                }
+            });
+            return;
+        }
+
+        $this->startProcessesForWorkerOutsideCoroutine($workerId);
+    }
+
+    private function startProcessesForWorkerOutsideCoroutine(int $workerId): void
+    {
         $entries = $this->processFactoriesByWorker[$workerId] ?? [];
         foreach ($entries as $entry) {
             $process = $entry['factory']();
