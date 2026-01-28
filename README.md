@@ -260,7 +260,7 @@ joining channels.
 
 ## Task Runner (Advanced)
 
-Requires Swoole (native or portable).
+Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $results = PHAPI::app()?->tasks()->parallel([
@@ -270,6 +270,14 @@ $results = PHAPI::app()?->tasks()->parallel([
 ```
 
 If any task throws, the task runner throws the first error it encounters.
+
+You can configure a timeout (seconds) for task completion:
+
+```php
+$api = new PHAPI([
+    'task_timeout' => 5.0,
+]);
+```
 
 ## Jobs (Lock/Block)
 
@@ -469,7 +477,7 @@ $api->get('/jobs', function (): Response {
 
 ## Task Runner
 
-Requires Swoole (native or portable).
+Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $results = $api->tasks()->parallel([
@@ -482,7 +490,7 @@ $results = $api->tasks()->parallel([
 
 ## HTTP Client
 
-Requires Swoole (native or portable).
+Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $data = $api->http()->getJson('https://example.com/api');
@@ -497,6 +505,8 @@ $api->container()->singleton(\PHAPI\Services\HttpClient::class, MyHttpClient::cl
 Errors thrown by `getJson()` include HTTP status and raw body via `HttpRequestException`.
 
 ## Redis (Swoole Coroutine)
+
+Requires a coroutine context (request handlers, jobs, or tasks).
 
 ```php
 $redis = $api->redis();
@@ -517,6 +527,8 @@ Config:
 ```
 
 ## MySQL (Swoole Coroutine)
+
+Requires a coroutine context (request handlers, jobs, or tasks).
 
 ```php
 $mysql = $api->mysql();

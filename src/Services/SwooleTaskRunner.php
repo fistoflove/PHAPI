@@ -6,6 +6,15 @@ namespace PHAPI\Services;
 
 class SwooleTaskRunner implements TaskRunner
 {
+    private ?float $timeoutSeconds;
+
+    public function __construct(?float $timeoutSeconds = null)
+    {
+        $this->timeoutSeconds = $timeoutSeconds !== null && $timeoutSeconds > 0
+            ? $timeoutSeconds
+            : null;
+    }
+
     /**
      * Run tasks in parallel using Swoole coroutines when available.
      *
@@ -18,10 +27,15 @@ class SwooleTaskRunner implements TaskRunner
             throw new \RuntimeException('Swoole coroutines are not available.');
         }
 
+        if ($tasks === []) {
+            return [];
+        }
+
         $results = [];
         $errors = [];
 
         $runner = function () use ($tasks, &$results, &$errors): void {
+            $timeout = $this->timeoutSeconds;
             if (class_exists('Swoole\\Coroutine\\WaitGroup')) {
                 $waitGroup = new \Swoole\Coroutine\WaitGroup();
                 foreach ($tasks as $key => $task) {
@@ -36,7 +50,10 @@ class SwooleTaskRunner implements TaskRunner
                         }
                     });
                 }
-                $waitGroup->wait();
+                $completed = $waitGroup->wait($timeout ?? -1);
+                if ($timeout !== null && $completed === false) {
+                    throw new \RuntimeException('Task runner timed out.');
+                }
                 return;
             }
 
@@ -55,8 +72,20 @@ class SwooleTaskRunner implements TaskRunner
                 });
             }
 
+            $deadline = $timeout !== null ? microtime(true) + $timeout : null;
             for ($i = 0; $i < count($tasks); $i++) {
-                $item = $channel->pop();
+                $popTimeout = -1;
+                if ($deadline !== null) {
+                    $remaining = $deadline - microtime(true);
+                    if ($remaining <= 0) {
+                        throw new \RuntimeException('Task runner timed out.');
+                    }
+                    $popTimeout = $remaining;
+                }
+                $item = $channel->pop($popTimeout);
+                if ($item === false) {
+                    throw new \RuntimeException('Task runner timed out.');
+                }
                 if (isset($item['error'])) {
                     $errors[$item['key']] = $item['error'];
                     continue;
@@ -65,11 +94,29 @@ class SwooleTaskRunner implements TaskRunner
             }
         };
 
-        if (\Swoole\Coroutine::getCid() < 0 && function_exists('Swoole\\Coroutine\\run')) {
-            \Swoole\Coroutine\run($runner);
-        } else {
-            $runner();
+        if (\Swoole\Coroutine::getCid() < 0) {
+            if (!function_exists('Swoole\\Coroutine\\run')) {
+                throw new \RuntimeException('Swoole coroutine runner is not available.');
+            }
+            $error = null;
+            \Swoole\Coroutine\run(function () use ($runner, &$error): void {
+                try {
+                    $runner();
+                } catch (\Throwable $e) {
+                    $error = $e;
+                }
+            });
+            if ($error !== null) {
+                throw $error;
+            }
+            if ($errors !== []) {
+                $first = reset($errors);
+                throw $first;
+            }
+            return $results;
         }
+
+        $runner();
 
         if ($errors !== []) {
             $first = reset($errors);

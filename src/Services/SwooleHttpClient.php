@@ -9,34 +9,10 @@ use PHAPI\Exceptions\HttpRequestException;
 class SwooleHttpClient implements HttpClient
 {
     /**
-     * Fetch and decode JSON using Swoole coroutine HTTP client.
-     *
-     * @param string $url
-     * @return array<string, mixed>
-     */
-    public function getJson(string $url): array
-    {
-        if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
-            throw new HttpRequestException($url, 0, '', 'Swoole coroutine HTTP client is not available.');
-        }
-
-        $meta = $this->getJsonWithMeta($url);
-        if ($meta['status'] < 200 || $meta['status'] >= 300) {
-            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'HTTP request returned non-2xx status');
-        }
-
-        if ($meta['data'] === null) {
-            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'Failed to decode JSON response');
-        }
-
-        return $meta['data'];
-    }
-
-    /**
      * @param string $url
      * @return array{data: array<string, mixed>|null, status: int, body: string}
      */
-    public function getJsonWithMeta(string $url): array
+    private function fetchJsonWithMeta(string $url): array
     {
         if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
             throw new HttpRequestException($url, 0, '', 'Swoole coroutine HTTP client is not available.');
@@ -70,5 +46,57 @@ class SwooleHttpClient implements HttpClient
             'status' => $status,
             'body' => $body,
         ];
+    }
+
+    /**
+     * Fetch and decode JSON using Swoole coroutine HTTP client.
+     *
+     * @param string $url
+     * @return array<string, mixed>
+     */
+    public function getJson(string $url): array
+    {
+        $meta = $this->getJsonWithMeta($url);
+        if ($meta['status'] < 200 || $meta['status'] >= 300) {
+            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'HTTP request returned non-2xx status');
+        }
+
+        if ($meta['data'] === null) {
+            throw new HttpRequestException($url, $meta['status'], $meta['body'], 'Failed to decode JSON response');
+        }
+
+        return $meta['data'];
+    }
+
+    /**
+     * @param string $url
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    public function getJsonWithMeta(string $url): array
+    {
+        if (!class_exists('Swoole\\Coroutine')) {
+            throw new HttpRequestException($url, 0, '', 'Swoole coroutines are not available.');
+        }
+
+        if (\Swoole\Coroutine::getCid() < 0) {
+            if (!function_exists('Swoole\\Coroutine\\run')) {
+                throw new HttpRequestException($url, 0, '', 'Swoole coroutine context is required.');
+            }
+            $result = null;
+            $error = null;
+            \Swoole\Coroutine\run(function () use ($url, &$result, &$error): void {
+                try {
+                    $result = $this->fetchJsonWithMeta($url);
+                } catch (\Throwable $e) {
+                    $error = $e;
+                }
+            });
+            if ($error !== null) {
+                throw $error;
+            }
+            return $result ?? ['data' => null, 'status' => 0, 'body' => ''];
+        }
+
+        return $this->fetchJsonWithMeta($url);
     }
 }

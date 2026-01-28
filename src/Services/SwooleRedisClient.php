@@ -11,7 +11,10 @@ final class SwooleRedisClient
      */
     private array $config;
 
-    private ?\Swoole\Coroutine\Redis $client = null;
+    /**
+     * @var array<int, \Swoole\Coroutine\Redis>
+     */
+    private array $clients = [];
 
     /**
      * @param array{host: string, port: int, auth: string|null, db: int|null, timeout: float} $config
@@ -26,12 +29,17 @@ final class SwooleRedisClient
      */
     private function connect(): \Swoole\Coroutine\Redis
     {
-        if ($this->client !== null && $this->client->connected) {
-            return $this->client;
+        if (!class_exists('Swoole\\Coroutine')) {
+            throw new \RuntimeException('Swoole coroutines are not available.');
         }
 
-        if (\Swoole\Coroutine::getCid() < 0) {
+        $cid = \Swoole\Coroutine::getCid();
+        if ($cid < 0) {
             throw new \RuntimeException('Redis client requires a Swoole coroutine context.');
+        }
+
+        if (isset($this->clients[$cid]) && $this->clients[$cid]->connected) {
+            return $this->clients[$cid];
         }
 
         $client = new \Swoole\Coroutine\Redis();
@@ -57,7 +65,15 @@ final class SwooleRedisClient
             }
         }
 
-        $this->client = $client;
+        $this->clients[$cid] = $client;
+        \Swoole\Coroutine::defer(function () use ($cid, $client): void {
+            if (isset($this->clients[$cid])) {
+                if (method_exists($client, 'close')) {
+                    $client->close();
+                }
+                unset($this->clients[$cid]);
+            }
+        });
 
         return $client;
     }

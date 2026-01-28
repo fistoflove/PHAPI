@@ -1056,7 +1056,9 @@ final class PHAPI
     {
         $driver = $this->runtimeManager->driver();
         if ($driver instanceof SwooleDriver) {
-            return new SwooleTaskRunner();
+            $timeout = $this->config['task_timeout'] ?? null;
+            $timeoutValue = $timeout === null ? null : (float)$timeout;
+            return new SwooleTaskRunner($timeoutValue);
         }
         throw new FeatureNotSupportedException('Task runner requires Swoole runtime.');
     }
