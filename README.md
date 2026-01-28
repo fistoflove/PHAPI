@@ -1,6 +1,7 @@
 # PHAPI
 
 Micro MVC framework for PHP built for Swoole. Write routes, middleware, auth, and jobs with a single Swoole runtime, including portable Swoole.
+PHAPI supports only the `swoole` and `portable_swoole` runtimes.
 
 ## Requirements
 
@@ -259,6 +260,8 @@ joining channels.
 
 ## Task Runner (Advanced)
 
+Requires Swoole (native or portable).
+
 ```php
 $results = PHAPI::app()?->tasks()->parallel([
     'a' => fn() => ['ok' => true],
@@ -309,7 +312,11 @@ APP_RUNTIME=portable_swoole php -d extension=/path/to/swoole.so app.php
 Or use the runner:
 
 ```bash
+# When installed via Composer
 APP_RUNTIME=portable_swoole php vendor/bin/phapi-run app.php
+
+# When running from this repository
+APP_RUNTIME=portable_swoole php bin/phapi-run app.php
 ```
 
 PHAPI registers `/monitor` by default. Disable it if you want to provide your own handler:
@@ -462,6 +469,8 @@ $api->get('/jobs', function (): Response {
 
 ## Task Runner
 
+Requires Swoole (native or portable).
+
 ```php
 $results = $api->tasks()->parallel([
     'a' => fn() => ['ok' => true],
@@ -472,6 +481,8 @@ $results = $api->tasks()->parallel([
 - Swoole: coroutines
 
 ## HTTP Client
+
+Requires Swoole (native or portable).
 
 ```php
 $data = $api->http()->getJson('https://example.com/api');
@@ -684,6 +695,11 @@ $api->container()->singleton(\PHAPI\Services\HttpClient::class, FakeHttpClient::
 ```bash
 composer test
 ```
+
+## Process Supervision
+
+PHAPI should run under a supervisor so it restarts on failure or reboot.
+See `docs/process-supervision.md` for systemd, supervisord, Docker, and PM2 examples.
 
 ## License
 

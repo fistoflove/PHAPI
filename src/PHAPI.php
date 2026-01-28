@@ -179,7 +179,7 @@ final class PHAPI
     }
 
     /**
-     * Set a fallback callback for realtime operations in unsupported runtimes.
+     * Set a fallback callback for realtime operations when WebSockets are unavailable.
      *
      * @param callable(string, array<string, mixed>): void $fallback
      * @return self
@@ -240,9 +240,6 @@ final class PHAPI
      */
     public function onWorkerStart(callable $handler): self
     {
-        if ($this->runtimeManager->driver()->isLongRunning() === false && (bool)($this->config['debug'] ?? false)) {
-            error_log('PHAPI: onWorkerStart is Swoole-only and is ignored in FPM/AMPHP.');
-        }
         $this->runtimeManager->driver()->onWorkerStart($handler);
         return $this;
     }

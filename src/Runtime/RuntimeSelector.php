@@ -20,13 +20,6 @@ class RuntimeSelector
     {
         $runtimeEnv = getenv('APP_RUNTIME');
         $runtime = $config['runtime'] ?? (($runtimeEnv === false || $runtimeEnv === '') ? 'swoole' : $runtimeEnv);
-        if ($runtime === 'auto') {
-            if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
-                throw new FeatureNotSupportedException('Swoole runtime requested but Swoole is not available.');
-            }
-            return self::createSwoole($config, 'swoole');
-        }
-
         if ($runtime === 'swoole') {
             if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
                 throw new FeatureNotSupportedException('Swoole runtime requested but Swoole is not available.');
