@@ -399,7 +399,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
     protected function deferTimer(callable $callback): void
     {
-        \Swoole\Timer::after(0, $callback);
+        \Swoole\Timer::after(1, $callback);
     }
 
     protected function deferEvent(callable $callback): void
