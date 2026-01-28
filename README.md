@@ -5,7 +5,7 @@ PHAPI supports only the `swoole` and `portable_swoole` runtimes.
 
 ## Requirements
 
-- PHP 8.3+
+- PHP 8.0+
 - Swoole extension (native or portable)
 
 ## Install

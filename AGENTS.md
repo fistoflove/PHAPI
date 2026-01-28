@@ -20,7 +20,7 @@ Examples:
 - `APP_RUNTIME=portable_swoole php bin/phapi-run example.php`
 
 ## Coding Style & Naming Conventions
-- PHP 8.3+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
+- PHP 8.0+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
 - Use meaningful, descriptive class names; prefer `PascalCase` for classes and `camelCase` for methods.
 - Formatting is enforced via PHP-CS-Fixer (`.php-cs-fixer.php`).
 - Static analysis via PHPStan (`phpstan.neon`, strict rules).
