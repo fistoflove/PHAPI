@@ -397,11 +397,18 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         return \Swoole\Coroutine::getCid();
     }
 
+    /**
+     * @param callable(): void $callback
+     */
     protected function deferTimer(callable $callback): void
     {
+        /** @phpstan-ignore-next-line */
         \Swoole\Timer::after(1, $callback);
     }
 
+    /**
+     * @param callable(): void $callback
+     */
     protected function deferEvent(callable $callback): void
     {
         \Swoole\Event::defer($callback);

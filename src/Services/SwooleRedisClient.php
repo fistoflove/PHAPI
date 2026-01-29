@@ -49,7 +49,7 @@ final class SwooleRedisClient
         $client = new \Redis();
         $connected = $client->connect($this->config['host'], $this->config['port'], $this->config['timeout']);
         if ($connected === false) {
-            $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+            $message = (string)$client->getLastError();
             $error = $message !== '' ? $message : 'Unable to connect to Redis.';
             throw new \RuntimeException($error);
         }
@@ -57,7 +57,7 @@ final class SwooleRedisClient
         $auth = $this->config['auth'];
         if ($auth !== null && $auth !== '') {
             if ($client->auth($auth) === false) {
-                $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+                $message = (string)$client->getLastError();
                 $error = $message !== '' ? $message : 'Redis auth failed.';
                 throw new \RuntimeException($error);
             }
@@ -66,13 +66,14 @@ final class SwooleRedisClient
         $db = $this->config['db'];
         if ($db !== null) {
             if ($client->select($db) === false) {
-                $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+                $message = (string)$client->getLastError();
                 $error = $message !== '' ? $message : 'Redis select failed.';
                 throw new \RuntimeException($error);
             }
         }
 
         $this->clients[$cid] = $client;
+        /** @phpstan-ignore-next-line */
         \Swoole\Coroutine::defer(function () use ($cid, $client): void {
             if (isset($this->clients[$cid])) {
                 $client->close();
@@ -85,7 +86,7 @@ final class SwooleRedisClient
 
     private function isConnected(\Redis $client): bool
     {
-        return method_exists($client, 'isConnected') ? $client->isConnected() : true;
+        return $client->isConnected();
     }
 
     public function get(string $key): ?string
@@ -97,7 +98,7 @@ final class SwooleRedisClient
     public function set(string $key, string $value, ?int $ttl = null): bool
     {
         if ($ttl !== null) {
-            return $this->connect()->setEx($key, $ttl, $value);
+            return $this->connect()->setex($key, $ttl, $value);
         }
 
         return $this->connect()->set($key, $value);
@@ -120,6 +121,6 @@ final class SwooleRedisClient
      */
     public function command(string $command, array $args = [])
     {
-        return $this->connect()->rawCommand($command, ...$args);
+        return $this->connect()->rawcommand($command, ...$args);
     }
 }

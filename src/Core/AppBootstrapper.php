@@ -13,9 +13,9 @@ use PHAPI\Server\MiddlewareManager;
 use PHAPI\Services\FallbackRealtime;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
+use PHAPI\Services\MySqlPool;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\RealtimeManager;
-use PHAPI\Services\SwooleMySqlClient;
 use PHAPI\Services\SwooleRedisClient;
 use PHAPI\Services\TaskRunner;
 
@@ -67,7 +67,7 @@ final class AppBootstrapper
         $container->singleton(SwooleRedisClient::class, static function () use ($app) {
             return $app->redis();
         });
-        $container->singleton(SwooleMySqlClient::class, static function () use ($app) {
+        $container->singleton(MySqlPool::class, static function () use ($app) {
             return $app->mysql();
         });
 

@@ -27,9 +27,9 @@ use PHAPI\Server\MiddlewareManager;
 use PHAPI\Server\Router;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
+use PHAPI\Services\MySqlPool;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\SwooleHttpClient;
-use PHAPI\Services\SwooleMySqlClient;
 use PHAPI\Services\SwooleRedisClient;
 use PHAPI\Services\SwooleTaskRunner;
 use PHAPI\Services\TaskRunner;
@@ -57,7 +57,7 @@ final class PHAPI
     private DefaultEndpoints $defaultEndpoints;
     private ProviderLoader $providerLoader;
     private ?SwooleRedisClient $redisClient = null;
-    private ?SwooleMySqlClient $mysqlClient = null;
+    private ?MySqlPool $mysqlPool = null;
     /**
      * @var array<int, \PHAPI\Core\ServiceProviderInterface>
      */
@@ -418,24 +418,7 @@ final class PHAPI
         $flags = defined('SWOOLE_HOOK_ALL') ? SWOOLE_HOOK_ALL : 0;
 
         try {
-            $method = new \ReflectionMethod('Swoole\\Runtime', 'enableCoroutine');
-            $params = $method->getParameters();
-            $count = count($params);
-            if ($count === 0) {
-                \Swoole\Runtime::enableCoroutine();
-                return;
-            }
-            if ($count === 1) {
-                \Swoole\Runtime::enableCoroutine($flags);
-                return;
-            }
-            $firstType = $params[0]->getType();
-            $firstIsBool = $firstType instanceof \ReflectionNamedType && $firstType->getName() === 'bool';
-            if ($firstIsBool) {
-                \Swoole\Runtime::enableCoroutine(true, $flags);
-                return;
-            }
-            \Swoole\Runtime::enableCoroutine($flags, true);
+            \Swoole\Runtime::enableCoroutine($flags);
         } catch (\Throwable $e) {
             error_log('PHAPI: failed to enable coroutine hooks: ' . $e->getMessage());
         }
@@ -888,15 +871,15 @@ final class PHAPI
     }
 
     /**
-     * Get the Swoole coroutine MySQL client.
+     * Get the MySQL connection pool.
      *
-     * @return SwooleMySqlClient
+     * @return MySqlPool
      */
-    public function mysql(): SwooleMySqlClient
+    public function mysql(): MySqlPool
     {
-        if ($this->mysqlClient === null) {
+        if ($this->mysqlPool === null) {
             $config = $this->config['mysql'] ?? [];
-            $this->mysqlClient = new SwooleMySqlClient([
+            $this->mysqlPool = new MySqlPool([
                 'host' => (string)($config['host'] ?? '127.0.0.1'),
                 'port' => (int)($config['port'] ?? 3306),
                 'user' => (string)($config['user'] ?? 'root'),
@@ -904,10 +887,12 @@ final class PHAPI
                 'database' => (string)($config['database'] ?? ''),
                 'charset' => (string)($config['charset'] ?? 'utf8mb4'),
                 'timeout' => isset($config['timeout']) ? (float)$config['timeout'] : 1.0,
+                'pool_size' => (int)($config['pool_size'] ?? 5),
+                'pool_timeout' => (float)($config['pool_timeout'] ?? 1.0),
             ]);
         }
 
-        return $this->mysqlClient;
+        return $this->mysqlPool;
     }
 
     /**

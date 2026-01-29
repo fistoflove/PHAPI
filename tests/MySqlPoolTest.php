@@ -2,13 +2,13 @@
 
 namespace PHAPI\Tests;
 
-use PHAPI\Services\SwooleMySqlClient;
+use PHAPI\Services\MySqlPool;
 
-final class SwooleMySqlClientTest extends SwooleTestCase
+final class MySqlPoolTest extends SwooleTestCase
 {
     public function testMySqlRequiresCoroutineContext(): void
     {
-        $client = new SwooleMySqlClient([
+        $pool = new MySqlPool([
             'host' => '127.0.0.1',
             'port' => 3306,
             'user' => 'root',
@@ -16,11 +16,13 @@ final class SwooleMySqlClientTest extends SwooleTestCase
             'database' => '',
             'charset' => 'utf8mb4',
             'timeout' => 1.0,
+            'pool_size' => 1,
+            'pool_timeout' => 0.01,
         ]);
 
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessage('MySQL client requires a Swoole coroutine context.');
 
-        $client->query('SELECT 1');
+        $pool->query('SELECT 1');
     }
 }

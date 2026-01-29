@@ -48,7 +48,8 @@
     },
     "suggest": {
         "ext-swoole": "Required for the Swoole runtime.",
-        "ext-redis": "Required for Redis support under Swoole 6.x."
+        "ext-redis": "Required for Redis support under Swoole 6.x.",
+        "ext-pdo_mysql": "Required for MySQL support under Swoole 6.x."
     },
     "bin": [
         "bin/phapi-run",

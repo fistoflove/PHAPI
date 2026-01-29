@@ -530,9 +530,10 @@ Config:
 ],
 ```
 
-## MySQL (Swoole Coroutine)
+## MySQL (PDO + Coroutine Hooks)
 
-Requires a coroutine context (request handlers, jobs, or tasks).
+Requires a coroutine context (request handlers, jobs, or tasks) and `ext-pdo_mysql`.
+PHAPI enables coroutine hooks by default so blocking PDO I/O yields in coroutines.
 
 ```php
 $mysql = $api->mysql();
@@ -551,6 +552,8 @@ Config:
     'database' => '',
     'charset' => 'utf8mb4',
     'timeout' => 1.0,
+    'pool_size' => 5,
+    'pool_timeout' => 1.0,
 ],
 ```
 

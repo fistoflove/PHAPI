@@ -33,5 +33,7 @@ return [
         'database' => '',
         'charset' => 'utf8mb4',
         'timeout' => 1.0,
+        'pool_size' => 5,
+        'pool_timeout' => 1.0,
     ],
 ];
