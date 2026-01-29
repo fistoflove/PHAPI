@@ -8,6 +8,7 @@ return [
     'host' => '0.0.0.0',
     'port' => 9501,
     'enable_websockets' => false,
+    'enable_coroutine_hooks' => true,
     'default_endpoints' => [
         'monitor' => true,
     ],

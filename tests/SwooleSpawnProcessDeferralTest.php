@@ -8,7 +8,7 @@ final class SwooleSpawnProcessDeferralTest extends SwooleTestCase
 {
     public function testDefersUntilOutsideCoroutine(): void
     {
-        $driver = new class([1, 1, -1]) extends SwooleDriver {
+        $driver = new class ([1, 1, -1]) extends SwooleDriver {
             public array $calls = [];
             private array $cidSequence;
 

@@ -8,6 +8,10 @@ final class SwooleRedisClientTest extends SwooleTestCase
 {
     public function testRedisRequiresCoroutineContext(): void
     {
+        if (!class_exists('Redis')) {
+            $this->markTestSkipped('ext-redis is required for Redis client tests.');
+        }
+
         $client = new SwooleRedisClient([
             'host' => '127.0.0.1',
             'port' => 6379,

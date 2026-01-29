@@ -12,7 +12,7 @@ final class SwooleRedisClient
     private array $config;
 
     /**
-     * @var array<int, \Swoole\Coroutine\Redis>
+     * @var array<int, \Redis>
      */
     private array $clients = [];
 
@@ -25,9 +25,9 @@ final class SwooleRedisClient
     }
 
     /**
-     * @return \Swoole\Coroutine\Redis
+     * @return \Redis
      */
-    private function connect(): \Swoole\Coroutine\Redis
+    private function connect(): \Redis
     {
         if (!class_exists('Swoole\\Coroutine')) {
             throw new \RuntimeException('Swoole coroutines are not available.');
@@ -38,21 +38,27 @@ final class SwooleRedisClient
             throw new \RuntimeException('Redis client requires a Swoole coroutine context.');
         }
 
-        if (isset($this->clients[$cid]) && $this->clients[$cid]->connected) {
+        if (!class_exists('Redis')) {
+            throw new \RuntimeException('ext-redis is required for Redis support.');
+        }
+
+        if (isset($this->clients[$cid]) && $this->isConnected($this->clients[$cid])) {
             return $this->clients[$cid];
         }
 
-        $client = new \Swoole\Coroutine\Redis();
+        $client = new \Redis();
         $connected = $client->connect($this->config['host'], $this->config['port'], $this->config['timeout']);
         if ($connected === false) {
-            $error = $client->errMsg !== '' ? $client->errMsg : 'Unable to connect to Redis.';
+            $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+            $error = $message !== '' ? $message : 'Unable to connect to Redis.';
             throw new \RuntimeException($error);
         }
 
         $auth = $this->config['auth'];
         if ($auth !== null && $auth !== '') {
             if ($client->auth($auth) === false) {
-                $error = $client->errMsg !== '' ? $client->errMsg : 'Redis auth failed.';
+                $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+                $error = $message !== '' ? $message : 'Redis auth failed.';
                 throw new \RuntimeException($error);
             }
         }
@@ -60,7 +66,8 @@ final class SwooleRedisClient
         $db = $this->config['db'];
         if ($db !== null) {
             if ($client->select($db) === false) {
-                $error = $client->errMsg !== '' ? $client->errMsg : 'Redis select failed.';
+                $message = method_exists($client, 'getLastError') ? (string)$client->getLastError() : '';
+                $error = $message !== '' ? $message : 'Redis select failed.';
                 throw new \RuntimeException($error);
             }
         }
@@ -68,14 +75,17 @@ final class SwooleRedisClient
         $this->clients[$cid] = $client;
         \Swoole\Coroutine::defer(function () use ($cid, $client): void {
             if (isset($this->clients[$cid])) {
-                if (method_exists($client, 'close')) {
-                    $client->close();
-                }
+                $client->close();
                 unset($this->clients[$cid]);
             }
         });
 
         return $client;
+    }
+
+    private function isConnected(\Redis $client): bool
+    {
+        return method_exists($client, 'isConnected') ? $client->isConnected() : true;
     }
 
     public function get(string $key): ?string

@@ -392,6 +392,7 @@ final class PHAPI
         if ($runMode === 'jobs') {
             return;
         }
+        $this->enableCoroutineHooks();
         $driver = $this->runtimeManager->driver();
         $this->jobsScheduler->registerSwooleJobs(
             $this->jobs,
@@ -401,6 +402,43 @@ final class PHAPI
             }
         );
         $driver->start($this->kernel);
+    }
+
+    private function enableCoroutineHooks(): void
+    {
+        if (!class_exists('Swoole\\Runtime')) {
+            return;
+        }
+
+        $enabled = $this->config['enable_coroutine_hooks'] ?? true;
+        if ($enabled === false) {
+            return;
+        }
+
+        $flags = defined('SWOOLE_HOOK_ALL') ? SWOOLE_HOOK_ALL : 0;
+
+        try {
+            $method = new \ReflectionMethod('Swoole\\Runtime', 'enableCoroutine');
+            $params = $method->getParameters();
+            $count = count($params);
+            if ($count === 0) {
+                \Swoole\Runtime::enableCoroutine();
+                return;
+            }
+            if ($count === 1) {
+                \Swoole\Runtime::enableCoroutine($flags);
+                return;
+            }
+            $firstType = $params[0]->getType();
+            $firstIsBool = $firstType instanceof \ReflectionNamedType && $firstType->getName() === 'bool';
+            if ($firstIsBool) {
+                \Swoole\Runtime::enableCoroutine(true, $flags);
+                return;
+            }
+            \Swoole\Runtime::enableCoroutine($flags, true);
+        } catch (\Throwable $e) {
+            error_log('PHAPI: failed to enable coroutine hooks: ' . $e->getMessage());
+        }
     }
 
     /**

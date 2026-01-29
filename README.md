@@ -508,7 +508,9 @@ Errors thrown by `getJson()` include HTTP status and raw body via `HttpRequestEx
 
 ## Redis (Swoole Coroutine)
 
-Requires a coroutine context (request handlers, jobs, or tasks).
+Requires a coroutine context (request handlers, jobs, or tasks) and the `ext-redis` PHP extension.
+PHAPI enables Swoole coroutine hooks by default so blocking Redis I/O yields in coroutines.
+You can disable this via `enable_coroutine_hooks` in config if needed.
 
 ```php
 $redis = $api->redis();

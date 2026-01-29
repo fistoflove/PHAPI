@@ -14,8 +14,8 @@ final class SwooleTaskRunnerTest extends SwooleTestCase
 
         $runner = new SwooleTaskRunner();
         $results = $runner->parallel([
-            'first' => static fn(): int => \Swoole\Coroutine::getCid(),
-            'second' => static fn(): int => \Swoole\Coroutine::getCid(),
+            'first' => static fn (): int => \Swoole\Coroutine::getCid(),
+            'second' => static fn (): int => \Swoole\Coroutine::getCid(),
         ]);
 
         $this->assertArrayHasKey('first', $results);
