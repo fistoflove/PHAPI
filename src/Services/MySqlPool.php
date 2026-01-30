@@ -133,7 +133,7 @@ final class MySqlPool
     private function poolIsFull(Channel $pool): bool
     {
         /** @phpstan-ignore-next-line */
-        return $pool->length() >= $pool->capacity();
+        return $pool->length() >= max(1, $this->config['pool_size']);
     }
 
     private function createConnection(): PDO
