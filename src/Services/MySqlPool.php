@@ -44,7 +44,8 @@ final class MySqlPool
             }
 
             $statement = $pdo->prepare($sql);
-            $statement->execute($params);
+            $this->bindParams($statement, $params);
+            $statement->execute();
             return $statement->fetchAll(PDO::FETCH_ASSOC);
         });
     }
@@ -60,7 +61,8 @@ final class MySqlPool
             }
 
             $statement = $pdo->prepare($sql);
-            return $statement->execute($params);
+            $this->bindParams($statement, $params);
+            return $statement->execute();
         });
     }
 
@@ -160,5 +162,23 @@ final class MySqlPool
                 PDO::ATTR_TIMEOUT => (int)$this->config['timeout'],
             ]
         );
+    }
+
+    /**
+     * @param array<int, mixed> $params
+     */
+    private function bindParams(\PDOStatement $statement, array $params): void
+    {
+        $index = 1;
+        foreach ($params as $param) {
+            if (is_array($param) && isset($param[0], $param[1]) && is_int($param[1])) {
+                $statement->bindValue($index, $param[0], $param[1]);
+            } elseif (is_array($param) && isset($param['value'], $param['type']) && is_int($param['type'])) {
+                $statement->bindValue($index, $param['value'], $param['type']);
+            } else {
+                $statement->bindValue($index, $param);
+            }
+            $index++;
+        }
     }
 }

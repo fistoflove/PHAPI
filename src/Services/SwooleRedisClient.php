@@ -104,6 +104,53 @@ final class SwooleRedisClient
         return $this->connect()->set($key, $value);
     }
 
+    public function expire(string $key, int $ttl): bool
+    {
+        return $this->connect()->expire($key, $ttl);
+    }
+
+    /**
+     * @param array<string, string> $data
+     */
+    public function hMSet(string $key, array $data): bool
+    {
+        return $this->connect()->hMset($key, $data);
+    }
+
+    public function hSet(string $key, string $field, string $value): bool
+    {
+        return (bool)$this->connect()->hSet($key, $field, $value);
+    }
+
+    public function hIncrBy(string $key, string $field, int $value): int
+    {
+        return (int)$this->connect()->hIncrBy($key, $field, $value);
+    }
+
+    public function hGet(string $key, string $field): string|false
+    {
+        return $this->connect()->hGet($key, $field);
+    }
+
+    public function zAdd(string $key, int $score, string $member): int
+    {
+        return (int)$this->connect()->zAdd($key, $score, $member);
+    }
+
+    public function zRemRangeByScore(string $key, int $min, int $max): int
+    {
+        return (int)$this->connect()->zRemRangeByScore($key, (string)$min, (string)$max);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function zRangeByScore(string $key, int $min, int $max): array
+    {
+        $result = $this->connect()->zRangeByScore($key, (string)$min, (string)$max);
+        return is_array($result) ? array_values($result) : [];
+    }
+
     public function del(string ...$keys): int
     {
         return $this->connect()->del(array_values($keys));
