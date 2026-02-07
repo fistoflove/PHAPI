@@ -678,7 +678,8 @@ $api = new PHAPI([
 ## LLM guide file
 
 When installing PHAPI via Composer, a `phapi-llms.txt` file is created in the project
-root (if it does not already exist). This file is a model-friendly reference that mirrors
+root (if it does not already exist). On `composer update`, the file is regenerated so it
+stays current. The generated file includes a timestamp and PHAPI version header and mirrors
 the `llms.txt` shipped in the repository for quick AI tooling context.
 
 ## Example Structure
