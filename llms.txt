@@ -1,0 +1,352 @@
+# PHAPI LLM Guide
+
+This document is a concise reference for PHAPI. It summarizes the framework structure,
+configuration, runtime behavior, and provides runnable examples for common features
+including routing, middleware, validation, jobs, tasks, realtime, Redis, MySQL, and
+the Hyperf-based ORM integration.
+
+## Project layout
+
+- `src/`: core runtime, HTTP stack, services, contracts.
+- `tests/`: PHPUnit tests (unit + integration).
+- `examples/`: runnable examples (single-file, multi-file, example app).
+- `config/`: default config (`config/phapi.php`).
+- `docs/`: staged implementation notes and supporting docs.
+- `bin/`: CLI helpers (`phapi-run`, `phapi-jobs`).
+
+## Runtime overview
+
+PHAPI is a lightweight API framework for Swoole with:
+
+- Routing and middleware
+- Request validation
+- Jobs + async tasks
+- Realtime via WebSockets
+- Redis + MySQL (PDO coroutine) clients
+- Optional Hyperf ORM integration
+
+Coroutine hooks are enabled by default (`enable_coroutine_hooks`). For Swoole, this
+allows blocking I/O (PDO, Redis) to yield cooperatively.
+
+## Basic app
+
+```php
+<?php
+
+require __DIR__ . '/vendor/autoload.php';
+
+use PHAPI\PHAPI;
+use PHAPI\HTTP\Response;
+
+$api = new PHAPI([
+    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
+    'host' => '0.0.0.0',
+    'port' => 9501,
+    'debug' => true,
+]);
+
+$api->get('/', fn () => Response::json(['message' => 'Hello from PHAPI']));
+
+$api->run();
+```
+
+## Routing + params
+
+```php
+$api->get('/users/{id}', function (): Response {
+    $request = PHAPI::request();
+    return Response::json(['user_id' => $request?->param('id')]);
+})->name('users.show');
+```
+
+URL generation:
+
+```php
+$url = $api->url('users.show', ['id' => 42]);
+```
+
+## Middleware
+
+Global:
+
+```php
+$api->middleware(function ($request, $next) {
+    return $next($request);
+});
+```
+
+Named:
+
+```php
+$api->addMiddleware('role:admin', function ($request, $next) {
+    return $next($request);
+});
+```
+
+Per-route:
+
+```php
+$api->get('/admin', fn () => Response::json(['ok' => true]))
+    ->middleware('role:admin');
+```
+
+## Validation
+
+```php
+$api->post('/users', fn () => Response::json(['created' => true], 201))
+    ->validate([
+        'name' => 'required|string|min:2',
+        'email' => 'required|email',
+    ]);
+```
+
+## Auth helpers
+
+```php
+$api->get('/protected', fn () => Response::json(['ok' => true]))
+    ->middleware($api->requireAuth());
+```
+
+Role checks:
+
+```php
+$api->get('/admin', fn () => Response::json(['ok' => true]))
+    ->middleware($api->requireRole('admin'));
+```
+
+## Jobs
+
+```php
+$api->schedule('cleanup', 300, function () {
+    echo "cleanup executed";
+}, [
+    'log_enabled' => true,
+    'lock_mode' => 'skip',
+]);
+```
+
+Run due jobs from CLI:
+
+```bash
+PHAPI_RUN_MODE=jobs php example.php
+```
+
+## Tasks (parallel work)
+
+```php
+$results = $api->tasks()->parallel([
+    fn () => 1 + 1,
+    fn () => 2 + 2,
+]);
+```
+
+## Realtime (WebSockets)
+
+```php
+$api->realtime()->broadcast('channel', ['event' => 'ping']);
+```
+
+Custom WS handler:
+
+```php
+$api->setWebSocketHandler(function ($server, $frame, $driver) {
+    $data = json_decode($frame->data ?? '', true);
+    if (!is_array($data)) {
+        return;
+    }
+    if (($data['action'] ?? '') === 'subscribe' && !empty($data['channel'])) {
+        $driver->subscribe($frame->fd, $data['channel']);
+    }
+});
+```
+
+## Redis (Swoole coroutine)
+
+```php
+$redis = $api->redis();
+$redis->set('greeting', 'hello', 30);
+$value = $redis->get('greeting');
+```
+
+Config (defaults in `config/phapi.php`):
+
+```php
+'redis' => [
+    'host' => '127.0.0.1',
+    'port' => 6379,
+    'auth' => null,
+    'db' => null,
+    'timeout' => 1.0,
+],
+```
+
+## MySQL (PDO + coroutine hooks)
+
+```php
+$mysql = $api->mysql();
+$rows = $mysql->query('SELECT 1 AS ok');
+$mysql->execute('INSERT INTO users(name) VALUES (?)', ['Ada']);
+```
+
+Config:
+
+```php
+'mysql' => [
+    'host' => '127.0.0.1',
+    'port' => 3306,
+    'user' => 'root',
+    'password' => '',
+    'database' => '',
+    'charset' => 'utf8mb4',
+    'timeout' => 1.0,
+    'pool_size' => 5,
+    'pool_timeout' => 1.0,
+],
+```
+
+## ORM (Hyperc DB stack)
+
+Install dependencies:
+
+```bash
+composer require hyperf/db-connection hyperf/database hyperf/config
+```
+
+Enable the provider and configure `orm.mysql`:
+
+```php
+use PHAPI\Providers\OrmMysqlProvider;
+
+$api = new PHAPI([
+    'providers' => [OrmMysqlProvider::class],
+    'orm' => [
+        'mysql' => [
+            'host' => '127.0.0.1',
+            'port' => 3306,
+            'database' => 'app',
+            'username' => 'root',
+            'password' => '',
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'options' => [
+                PDO::ATTR_EMULATE_PREPARES => false,
+                PDO::ATTR_STRINGIFY_FETCHES => false,
+            ],
+            'pool' => [
+                'min_connections' => 2,
+                'max_connections' => 50,
+                'connect_timeout' => 10.0,
+                'wait_timeout' => 3.0,
+                'max_idle_time' => 60.0,
+            ],
+            'log_queries' => false,
+        ],
+    ],
+]);
+```
+
+If `orm.mysql` is missing, PHAPI derives it from the existing `mysql` config block.
+
+Query builder:
+
+```php
+$users = $api->database()->table('users')
+    ->where('active', 1)
+    ->orderByDesc('id')
+    ->get();
+```
+
+Models:
+
+```php
+use PHAPI\Database\PhapiModel;
+
+final class User extends PhapiModel
+{
+    protected ?string $table = 'users';
+}
+
+$active = User::query()->where('active', 1)->get();
+```
+
+Transactions:
+
+```php
+$api->database()->transaction(function () use ($api) {
+    $api->database()->statement('UPDATE wallets SET balance = balance - 1 WHERE id = ?', [1]);
+    $api->database()->statement('UPDATE wallets SET balance = balance + 1 WHERE id = ?', [2]);
+});
+```
+
+Parallel DB work:
+
+```php
+$results = $api->tasks()->parallel([
+    fn () => $api->database()->table('users')->count(),
+    fn () => $api->database()->table('orders')->count(),
+]);
+```
+
+Query logging: set `orm.mysql.log_queries = true`. If the connection does not
+support `listen()`, PHAPI logs a warning and skips logging.
+
+## Error responses
+
+```php
+return Response::error('Not found', 404, ['resource' => 'user']);
+```
+
+## Security headers
+
+```php
+$api->enableSecurityHeaders([
+    'X-Frame-Options' => 'DENY',
+]);
+```
+
+## CORS
+
+```php
+$api->enableCORS('*');
+```
+
+## Access logging
+
+```php
+$api = new PHAPI([
+    'access_logger' => function ($request, $response, array $meta) {
+        error_log(json_encode([
+            'method' => $request->method(),
+            'path' => $request->path(),
+            'status' => $response->status(),
+            'request_id' => $meta['request_id'],
+            'duration_ms' => $meta['duration_ms'],
+        ]));
+    },
+]);
+```
+
+## Testing
+
+- `composer test`: full PHPUnit suite with testdox output.
+- `composer test:integration`: integration-only.
+- `composer phpstan`: static analysis.
+- `composer lint`: PHP-CS-Fixer dry-run.
+
+## Runtime selection
+
+Set `APP_RUNTIME` to choose runtime:
+
+```bash
+APP_RUNTIME=swoole php example.php
+APP_RUNTIME=portable_swoole php bin/phapi-run example.php
+```
+
+---
+
+For more detail, see:
+
+- `README.md`
+- `docs/database-orm-mysql.md`
+- `docs/project-structure.md`
