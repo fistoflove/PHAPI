@@ -557,6 +557,43 @@ Config:
 ],
 ```
 
+## ORM (MySQL via Hyperf)
+
+Requires a coroutine context, `ext-pdo_mysql`, and the Hyperf DB packages:
+
+```bash
+composer require hyperf/db-connection hyperf/database hyperf/config
+```
+
+Register the provider and use the PHAPI database service or base model:
+
+```php
+use PHAPI\PHAPI;
+use PHAPI\Providers\OrmMysqlProvider;
+use PHAPI\Database\PhapiModel;
+
+$api = new PHAPI([
+    'providers' => [OrmMysqlProvider::class],
+    'orm' => [
+        'mysql' => [
+            'database' => 'app',
+            'username' => 'root',
+            'password' => '',
+        ],
+    ],
+]);
+
+$users = $api->database()->table('users')->where('active', 1)->get();
+
+final class User extends PhapiModel
+{
+    protected ?string $table = 'users';
+}
+```
+
+If `orm.mysql` is missing, PHAPI derives it from the existing `mysql` block for compatibility.
+See `docs/database-orm-mysql.md` for full configuration and usage notes.
+
 ## Error Responses
 
 `Response::error()` returns a JSON payload with `error` plus any extra fields you pass.
@@ -637,6 +674,12 @@ $api = new PHAPI([
     },
 ]);
 ```
+
+## LLM guide file
+
+When installing PHAPI via Composer, a `phapi-llms.txt` file is created in the project
+root (if it does not already exist). This file is a model-friendly reference that mirrors
+the `llms.txt` shipped in the repository for quick AI tooling context.
 
 ## Example Structure
 

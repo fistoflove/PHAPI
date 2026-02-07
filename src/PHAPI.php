@@ -15,6 +15,7 @@ use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
+use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
@@ -339,6 +340,16 @@ final class PHAPI
     public function container(): Container
     {
         return $this->container;
+    }
+
+    /**
+     * Access the loaded configuration.
+     *
+     * @return array<string, mixed>
+     */
+    public function config(): array
+    {
+        return $this->config;
     }
 
     /**
@@ -868,6 +879,26 @@ final class PHAPI
         }
 
         return $this->redisClient;
+    }
+
+    /**
+     * Get the ORM database service.
+     *
+     * @return DatabaseInterface
+     */
+    public function database(): DatabaseInterface
+    {
+        return $this->container->get(DatabaseInterface::class);
+    }
+
+    /**
+     * Access the PHAPI database service, if registered.
+     *
+     * @return DatabaseInterface|null
+     */
+    public static function db(): ?DatabaseInterface
+    {
+        return static::app()?->database();
     }
 
     /**
