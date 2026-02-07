@@ -28,6 +28,9 @@
     "require": {
         "php": "^8.0",
         "ext-swoole": "*",
+        "hyperf/config": "^3.1",
+        "hyperf/database": "^3.1",
+        "hyperf/db-connection": "^3.1",
         "psr/container": "^2.0"
     },
     "require-dev": {
@@ -63,7 +66,13 @@
         "lint": "php-cs-fixer fix --dry-run --diff",
         "lint:fix": "php-cs-fixer fix",
         "phpunit": "phpunit",
-        "phpstan": "PHPSTAN_DISABLE_PARALLEL=1 php vendor/bin/phpstan analyse -c phpstan.neon --no-progress"
+        "phpstan": "PHPSTAN_DISABLE_PARALLEL=1 php vendor/bin/phpstan analyse -c phpstan.neon --no-progress",
+        "post-install-cmd": [
+            "@php -r \"\$source=__DIR__.'/llms.txt'; \$target=getcwd().'/phapi-llms.txt'; if (file_exists(\$source) && !file_exists(\$target)) { copy(\$source, \$target); }\""
+        ],
+        "post-update-cmd": [
+            "@php -r \"\$source=__DIR__.'/llms.txt'; \$target=getcwd().'/phapi-llms.txt'; if (file_exists(\$source) && !file_exists(\$target)) { copy(\$source, \$target); }\""
+        ]
     },
     "config": {
         "sort-packages": true,
