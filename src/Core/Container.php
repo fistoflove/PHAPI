@@ -83,6 +83,7 @@ class Container implements ContainerInterface
             'concrete' => $concrete,
             'scope' => 'singleton',
         ];
+        unset($this->instances[$id]);
         unset($this->requestInstances[$id]);
     }
 

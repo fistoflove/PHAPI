@@ -31,6 +31,10 @@ class Router
      */
     private array $namedRoutes = [];
     /**
+     * @var array<string, array<int, int>>
+     */
+    private array $routeIndexByFirstSegment = [];
+    /**
      * @var array<int, string>
      */
     private array $prefixStack = [''];
@@ -78,6 +82,10 @@ class Router
 
         $this->routes[] = $route;
         $index = array_key_last($this->routes);
+        if ($index !== null) {
+            $firstSegment = $this->firstSegmentForRoute($segments);
+            $this->routeIndexByFirstSegment[$firstSegment][] = $index;
+        }
 
         if ($name !== null) {
             $this->namedRoutes[$name] = $route;
@@ -105,6 +113,7 @@ class Router
         /** @var RouteDefinition $route */
         $route = array_merge($current, $updates);
         $this->routes[$index] = $route;
+        $this->rebuildRouteIndex();
 
         if ($oldName !== null && $oldName !== $route['name']) {
             unset($this->namedRoutes[$oldName]);
@@ -127,8 +136,12 @@ class Router
     {
         $allowed = [];
         $method = strtoupper($method);
-
-        foreach ($this->routes as $route) {
+        $candidateIndexes = $this->candidateIndexesForPath($path);
+        foreach ($candidateIndexes as $index) {
+            if (!isset($this->routes[$index])) {
+                continue;
+            }
+            $route = $this->routes[$index];
             if (!$this->hostMatches($route['host'], $host)) {
                 continue;
             }
@@ -348,5 +361,61 @@ class Router
         }
 
         return strtolower($constraint) === $host;
+    }
+
+    /**
+     * @param string $path
+     * @return array<int, int>
+     */
+    private function candidateIndexesForPath(string $path): array
+    {
+        $segment = $this->firstSegmentForPath($path);
+        $specific = $this->routeIndexByFirstSegment[$segment] ?? [];
+        $wildcard = $this->routeIndexByFirstSegment['*'] ?? [];
+        if ($segment === '') {
+            $root = $this->routeIndexByFirstSegment[''] ?? [];
+            $specific = array_merge($root, $specific);
+        }
+
+        $candidates = array_values(array_unique(array_merge($specific, $wildcard)));
+        sort($candidates);
+        return $candidates;
+    }
+
+    /**
+     * @param array<int, RouteSegment> $segments
+     */
+    private function firstSegmentForRoute(array $segments): string
+    {
+        if ($segments === []) {
+            return '';
+        }
+
+        $first = $segments[0];
+        if ($first['type'] === 'static') {
+            return $first['value'];
+        }
+
+        return '*';
+    }
+
+    private function firstSegmentForPath(string $path): string
+    {
+        $trimmed = trim($path, '/');
+        if ($trimmed === '') {
+            return '';
+        }
+
+        $parts = explode('/', $trimmed, 2);
+        return $parts[0];
+    }
+
+    private function rebuildRouteIndex(): void
+    {
+        $this->routeIndexByFirstSegment = [];
+        foreach ($this->routes as $routeIndex => $route) {
+            $firstSegment = $this->firstSegmentForRoute($route['segments']);
+            $this->routeIndexByFirstSegment[$firstSegment][] = $routeIndex;
+        }
     }
 }

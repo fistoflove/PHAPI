@@ -480,8 +480,19 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     private function emit($swooleResponse, Response $response): void
     {
         $swooleResponse->status($response->status());
-        foreach ($response->headers() as $name => $value) {
-            $swooleResponse->header($name, $value);
+        $headers = $response->headerLines();
+        $counts = [];
+        foreach ($headers as $header) {
+            $lower = strtolower($header['name']);
+            $counts[$lower] = ($counts[$lower] ?? 0) + 1;
+        }
+
+        foreach ($headers as $header) {
+            $name = $header['name'];
+            $value = $header['value'];
+            $lowerName = strtolower($name);
+            $replace = ($counts[$lowerName] ?? 0) <= 1 && $lowerName !== 'set-cookie';
+            $swooleResponse->header($name, $value, $replace);
         }
 
         if ($response->isStream()) {

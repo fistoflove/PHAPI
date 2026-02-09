@@ -13,7 +13,7 @@ composer require hyperf/db-connection hyperf/database hyperf/config
 Requirements:
 
 - PHP `ext-pdo_mysql`
-- Swoole runtime (native or portable)
+- Swoole runtime
 - Coroutine hooks enabled (`enable_coroutine_hooks` = true)
 
 ## Configuration

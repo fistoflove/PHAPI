@@ -9,11 +9,8 @@ What it demonstrates
 
 How to run
 
-Native Swoole:
+Swoole:
   APP_RUNTIME=swoole php examples/multi-runtime/app.php
-
-Portable Swoole:
-  APP_RUNTIME=portable_swoole php bin/phapi-run examples/multi-runtime/app.php
 
 Routes
 - GET /            -> basic status

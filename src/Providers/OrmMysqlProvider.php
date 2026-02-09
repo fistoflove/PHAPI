@@ -56,7 +56,11 @@ final class OrmMysqlProvider implements ServiceProviderInterface
     public function boot(PHAPI $app): void
     {
         $resolver = $app->container()->get(ConnectionResolver::class);
-        Model::setConnectionResolver($resolver);
+        try {
+            Model::setConnectionResolver($resolver);
+        } catch (\Throwable $e) {
+            error_log('PHAPI ORM MySQL: failed to set model connection resolver: ' . $e->getMessage());
+        }
         $config = $app->config();
         $ormConfig = $this->resolveOrmMysqlConfig($config);
         if (($ormConfig['log_queries'] ?? false) === true) {

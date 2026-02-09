@@ -1,12 +1,12 @@
 # PHAPI
 
-Micro MVC framework for PHP built for Swoole. Write routes, middleware, auth, and jobs with a single Swoole runtime, including portable Swoole.
-PHAPI supports only the `swoole` and `portable_swoole` runtimes.
+Micro MVC framework for PHP built for Swoole. Write routes, middleware, auth, and jobs with a single Swoole runtime.
+PHAPI supports only the `swoole` runtime.
 
 ## Requirements
 
 - PHP 8.0+
-- Swoole extension (native or portable)
+- Swoole extension
 
 ## Install
 
@@ -123,7 +123,7 @@ Multiple `onWorkerStart()` handlers are supported; they run in registration orde
 ```php
 $runtime = $api->runtime();
 
-$runtime->name(); // swoole or portable_swoole
+$runtime->name(); // swoole
 $runtime->supportsWebSockets();
 $runtime->isLongRunning();
 ```
@@ -260,7 +260,7 @@ joining channels.
 
 ## Task Runner (Advanced)
 
-Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
+Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $results = PHAPI::app()?->tasks()->parallel([
@@ -301,31 +301,6 @@ If a job throws, the run is recorded as `error` and the message is logged.
 ## Runtime Selection
 
 - `APP_RUNTIME=swoole` (default)
-- `APP_RUNTIME=portable_swoole` (loads a bundled `swoole.so`)
-
-Swoole uses the native PHP extension only.
-
-Portable Swoole will attempt to load a bundled `swoole.so` from
-`portable-swoole/bin/extensions` or a path provided via:
-
-- `PHAPI_PORTABLE_SWOOLE_DIR`
-- `PHAPI_PORTABLE_SWOOLE_EXT`
-
-If your PHP build does not allow `dl()`, run via:
-
-```bash
-APP_RUNTIME=portable_swoole php -d extension=/path/to/swoole.so app.php
-```
-
-Or use the runner:
-
-```bash
-# When installed via Composer
-APP_RUNTIME=portable_swoole php vendor/bin/phapi-run app.php
-
-# When running from this repository
-APP_RUNTIME=portable_swoole php bin/phapi-run app.php
-```
 
 PHAPI registers `/monitor` by default. Disable it if you want to provide your own handler:
 
@@ -337,7 +312,7 @@ $api = new PHAPI([
 ]);
 ```
 
-When using the runner, PHAPI will mark the runtime as `portable_swoole` in `/monitor`.
+
 
 ## Routing
 
@@ -467,7 +442,7 @@ $api->spawnProcess(function () {
 });
 ```
 
-Portable Swoole may invoke worker-start hooks inside a coroutine; PHAPI defers process start to a timer so it runs outside coroutines.
+Worker-start hooks are executed in registration order. Process spawning remains coroutine-safe via deferral when required.
 
 ## Job Logs Endpoint
 
@@ -479,7 +454,7 @@ $api->get('/jobs', function (): Response {
 
 ## Task Runner
 
-Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
+Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $results = $api->tasks()->parallel([
@@ -492,7 +467,7 @@ $results = $api->tasks()->parallel([
 
 ## HTTP Client
 
-Requires Swoole (native or portable). If invoked outside a coroutine, PHAPI will start one when supported.
+Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
 $data = $api->http()->getJson('https://example.com/api');
@@ -714,11 +689,7 @@ WebSocket subscriptions.
 Run it with:
 
 ```bash
-# Native Swoole
 APP_RUNTIME=swoole php examples/multi-runtime/app.php
-
-# Portable Swoole
-APP_RUNTIME=portable_swoole php bin/phapi-run examples/multi-runtime/app.php
 ```
 
 ## Examples

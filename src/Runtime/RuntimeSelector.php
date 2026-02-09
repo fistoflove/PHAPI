@@ -28,19 +28,10 @@ class RuntimeSelector
         }
 
         if ($runtime === 'portable_swoole') {
-            if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
-                if (!PortableSwooleLoader::load($config)) {
-                    throw new FeatureNotSupportedException(
-                        'Portable Swoole runtime requested but Swoole could not be loaded. ' .
-                        'Set PHAPI_PORTABLE_SWOOLE_DIR or PHAPI_PORTABLE_SWOOLE_EXT, ' .
-                        'run via bin/phapi-run, or start PHP with -d extension=/path/to/swoole.so.'
-                    );
-                }
-            }
-            return self::createSwoole($config, 'portable_swoole');
+            throw new FeatureNotSupportedException('portable_swoole runtime is no longer supported. Use runtime=swoole.');
         }
 
-        throw new FeatureNotSupportedException('Only swoole or portable_swoole runtimes are supported.');
+        throw new FeatureNotSupportedException("Unsupported runtime '{$runtime}'. Supported runtime: swoole.");
     }
 
     /**

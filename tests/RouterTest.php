@@ -37,4 +37,28 @@ class RouterTest extends TestCase
         $this->assertNull($match['route']);
         $this->assertSame(['GET'], $match['allowed']);
     }
+
+    public function testCandidateIndexingPreservesRegistrationPrecedence(): void
+    {
+        $router = new Router();
+        $router->addRoute('GET', '/{slug}', fn () => 'wild');
+        $router->addRoute('GET', '/users', fn () => 'static');
+
+        $match = $router->match('GET', '/users', null);
+
+        $this->assertNotNull($match['route']);
+        $this->assertSame('/{slug}', $match['route']['path']);
+    }
+
+    public function testCandidateIndexingStillAllowsWildcardMethodTracking(): void
+    {
+        $router = new Router();
+        $router->addRoute('GET', '/{slug}', fn () => null);
+        $router->addRoute('POST', '/users/{id}', fn () => null);
+
+        $match = $router->match('PUT', '/users/123', null);
+
+        $this->assertNull($match['route']);
+        $this->assertSame(['POST'], $match['allowed']);
+    }
 }

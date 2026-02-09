@@ -8,7 +8,7 @@ class Response
 {
     private int $status;
     /**
-     * @var array<string, string>
+     * @var array<int, array{name: string, value: string}>
      */
     private array $headers = [];
     private string $body = '';
@@ -17,14 +17,14 @@ class Response
 
     /**
      * @param int $status
-     * @param array<string, string> $headers
+     * @param array<string, string|array<int, string>> $headers
      * @param string $body
      * @return void
      */
     private function __construct(int $status = 200, array $headers = [], string $body = '')
     {
         $this->status = $status;
-        $this->headers = $headers;
+        $this->setHeaders($headers);
         $this->body = $body;
     }
 
@@ -110,7 +110,7 @@ class Response
      *
      * @param callable(): (iterable<mixed>|string|null) $callback
      * @param int $status
-     * @param array<string, string> $headers
+     * @param array<string, string|array<int, string>> $headers
      * @return self
      */
     public static function stream(callable $callback, int $status = 200, array $headers = []): self
@@ -137,7 +137,39 @@ class Response
      */
     public function headers(): array
     {
+        $collapsed = [];
+        foreach ($this->headers as $header) {
+            $collapsed[$header['name']] = $header['value'];
+        }
+        return $collapsed;
+    }
+
+    /**
+     * Get response headers as name/value pairs, preserving duplicates and order.
+     *
+     * @return array<int, array{name: string, value: string}>
+     */
+    public function headerLines(): array
+    {
         return $this->headers;
+    }
+
+    /**
+     * Get all values for a given header name.
+     *
+     * @param string $name
+     * @return array<int, string>
+     */
+    public function headerValues(string $name): array
+    {
+        $values = [];
+        $lowerName = strtolower($name);
+        foreach ($this->headers as $header) {
+            if (strtolower($header['name']) === $lowerName) {
+                $values[] = $header['value'];
+            }
+        }
+        return $values;
     }
 
     /**
@@ -183,7 +215,22 @@ class Response
     public function withHeader(string $key, string $value): self
     {
         $clone = clone $this;
-        $clone->headers[$key] = $value;
+        $clone->removeHeader($key);
+        $clone->headers[] = ['name' => $key, 'value' => $value];
+        return $clone;
+    }
+
+    /**
+     * Return a copy with an added header value.
+     *
+     * @param string $key
+     * @param string $value
+     * @return self
+     */
+    public function withAddedHeader(string $key, string $value): self
+    {
+        $clone = clone $this;
+        $clone->headers[] = ['name' => $key, 'value' => $value];
         return $clone;
     }
 
@@ -211,5 +258,33 @@ class Response
         $clone = clone $this;
         $clone->body = $body;
         return $clone;
+    }
+
+    /**
+     * @param array<string, string|array<int, string>> $headers
+     * @return void
+     */
+    private function setHeaders(array $headers): void
+    {
+        $this->headers = [];
+        foreach ($headers as $name => $values) {
+            if (is_array($values)) {
+                foreach ($values as $value) {
+                    $this->headers[] = ['name' => $name, 'value' => (string)$value];
+                }
+                continue;
+            }
+
+            $this->headers[] = ['name' => $name, 'value' => (string)$values];
+        }
+    }
+
+    private function removeHeader(string $name): void
+    {
+        $lowerName = strtolower($name);
+        $this->headers = array_values(array_filter(
+            $this->headers,
+            static fn (array $header): bool => strtolower($header['name']) !== $lowerName
+        ));
     }
 }

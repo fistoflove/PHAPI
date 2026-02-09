@@ -39,9 +39,26 @@ final class ConfigLoader
         $defaults['runtime'] = ($runtimeEnv === false || $runtimeEnv === '')
             ? ($defaults['runtime'] ?? 'swoole')
             : $runtimeEnv;
-        $defaults['debug'] = ($debugEnv !== false && $debugEnv !== '');
+        $defaults['debug'] = $this->parseBoolEnv($debugEnv);
 
         return $defaults;
+    }
+
+    /**
+     * @param string|false $value
+     */
+    private function parseBoolEnv($value): bool
+    {
+        if ($value === false) {
+            return false;
+        }
+
+        $normalized = strtolower(trim($value));
+        if ($normalized === '') {
+            return false;
+        }
+
+        return in_array($normalized, ['1', 'true', 'yes', 'on'], true);
     }
 
     private function envPath(): ?string

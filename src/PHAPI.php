@@ -22,6 +22,7 @@ use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
 use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\SwooleDriver;
+use PHAPI\Routing\Route as RouteLoader;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
@@ -71,6 +72,16 @@ final class PHAPI
      * @var callable(\Swoole\WebSocket\Server, mixed, SwooleDriver): void|null
      */
     private $webSocketHandler = null;
+    private bool $deferGroupPop = false;
+    private int $deferredGroupCount = 0;
+    /**
+     * @var array<int, int>
+     */
+    private array $deferredGroupMarkers = [];
+    /**
+     * @var array<int, array<int, array<string, mixed>>>
+     */
+    private array $groupMiddlewareStack = [[]];
 
     /**
      * Create a new PHAPI instance with configuration overrides.
@@ -487,6 +498,23 @@ final class PHAPI
                 require $path;
             }
         }
+
+        $routeEntry = $this->config['route_entry'] ?? null;
+        if (is_string($routeEntry) && $routeEntry !== '') {
+            $entryPath = $this->resolvePath($baseDir, $routeEntry);
+            if (file_exists($entryPath)) {
+                require $entryPath;
+            }
+            return;
+        }
+
+        if (!file_exists($baseDir . '/app/routes.php')) {
+            $defaultEntry = $baseDir . '/routes/routes.php';
+            if (file_exists($defaultEntry)) {
+                RouteLoader::init($baseDir . '/routes', $this);
+                require $defaultEntry;
+            }
+        }
     }
 
     /**
@@ -499,8 +527,90 @@ final class PHAPI
     public function group(string $prefix, callable $define): void
     {
         $this->router->pushPrefix($prefix);
-        $define($this);
-        $this->router->popPrefix();
+        $this->groupMiddlewareStack[] = [];
+        try {
+            $define($this);
+        } finally {
+            if ($this->deferGroupPop) {
+                $this->deferredGroupCount++;
+            } else {
+                array_pop($this->groupMiddlewareStack);
+                $this->router->popPrefix();
+            }
+        }
+    }
+
+    /**
+     * Begin a deferred group scope used by grouped route loaders.
+     *
+     * @return void
+     */
+    public function beginDeferredGroupScope(): void
+    {
+        $this->deferredGroupMarkers[] = $this->deferredGroupCount;
+        $this->deferGroupPop = true;
+    }
+
+    /**
+     * End a deferred group scope and pop groups opened within it.
+     *
+     * @return void
+     */
+    public function endDeferredGroupScope(): void
+    {
+        $marker = array_pop($this->deferredGroupMarkers);
+        if (!is_int($marker)) {
+            $this->deferGroupPop = false;
+            return;
+        }
+
+        while ($this->deferredGroupCount > $marker) {
+            if (count($this->groupMiddlewareStack) > 1) {
+                array_pop($this->groupMiddlewareStack);
+            }
+            $this->router->popPrefix();
+            $this->deferredGroupCount--;
+        }
+
+        if ($this->deferredGroupMarkers === []) {
+            $this->deferGroupPop = false;
+        }
+    }
+
+    /**
+     * Register middleware in the current group scope.
+     *
+     * @param callable(\PHAPI\HTTP\Request): mixed|callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): mixed|string $handler
+     * @return self
+     */
+    public function groupMiddleware($handler): self
+    {
+        $this->groupMiddlewareStack[array_key_last($this->groupMiddlewareStack)][] = $this->normalizeRouteMiddleware($handler);
+        return $this;
+    }
+
+    /**
+     * Load a route file from routes/ by name.
+     *
+     * @param string $name
+     * @return void
+     */
+    public function load(string $name): void
+    {
+        RouteLoader::init($this->routesBaseDir(), $this);
+        RouteLoader::load($name);
+    }
+
+    /**
+     * Load a grouped route directory from routes/.
+     *
+     * @param string $group
+     * @return void
+     */
+    public function loadGroup(string $group): void
+    {
+        RouteLoader::init($this->routesBaseDir(), $this);
+        RouteLoader::loadGroup($group);
     }
 
     /**
@@ -957,7 +1067,7 @@ final class PHAPI
      */
     private function registerBuilder(string $method, string $path, $handler): RouteBuilder
     {
-        $builder = new RouteBuilder($this, $method, $path, $handler);
+        $builder = new RouteBuilder($this, $method, $path, $handler, $this->currentGroupMiddleware());
         $builder->register();
         return $builder;
     }
@@ -1126,4 +1236,65 @@ final class PHAPI
         throw new FeatureNotSupportedException('HTTP client requires Swoole runtime.');
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function currentGroupMiddleware(): array
+    {
+        $merged = [];
+        foreach ($this->groupMiddlewareStack as $frame) {
+            foreach ($frame as $middleware) {
+                $merged[] = $middleware;
+            }
+        }
+
+        return $merged;
+    }
+
+    /**
+     * @param callable(\PHAPI\HTTP\Request): mixed|callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): mixed|string $middleware
+     * @return array<string, mixed>
+     */
+    private function normalizeRouteMiddleware($middleware): array
+    {
+        if (is_string($middleware) && class_exists($middleware)) {
+            return ['type' => 'inline', 'handler' => $this->classMiddleware($middleware)];
+        }
+
+        if (is_string($middleware)) {
+            $parts = explode(':', $middleware, 2);
+            $name = $parts[0];
+            $args = [];
+            if (isset($parts[1])) {
+                $args = array_filter(explode('|', $parts[1]), fn ($part) => $part !== '');
+            }
+            return ['type' => 'named', 'name' => $name, 'args' => $args];
+        }
+
+        if (is_callable($middleware)) {
+            return ['type' => 'inline', 'handler' => $middleware];
+        }
+
+        throw new \InvalidArgumentException('Invalid route middleware definition');
+    }
+
+    private function routesBaseDir(): string
+    {
+        $baseDir = $this->config['app_base_dir'] ?? getcwd();
+        $configured = $this->config['routes_dir'] ?? 'routes';
+        return $this->resolvePath((string)$baseDir, (string)$configured);
+    }
+
+    private function resolvePath(string $baseDir, string $path): string
+    {
+        if ($path === '') {
+            return rtrim($baseDir, '/\\');
+        }
+
+        if (preg_match('/^(?:[A-Za-z]:[\\\\\\/]|[\\\\\\/]{1,2}|\\/)/', $path) === 1) {
+            return $path;
+        }
+
+        return rtrim($baseDir, '/\\') . DIRECTORY_SEPARATOR . ltrim($path, '/\\');
+    }
 }

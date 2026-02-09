@@ -38,14 +38,16 @@ class RouteBuilder
      * @param string $method
      * @param string $path
      * @param mixed $handler
+     * @param array<int, array<string, mixed>> $initialMiddleware
      * @return void
      */
-    public function __construct(PHAPI $api, string $method, string $path, $handler)
+    public function __construct(PHAPI $api, string $method, string $path, $handler, array $initialMiddleware = [])
     {
         $this->api = $api;
         $this->method = $method;
         $this->path = $path;
         $this->handler = $handler;
+        $this->middleware = $initialMiddleware;
     }
 
     /**
