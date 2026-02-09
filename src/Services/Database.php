@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
+use Closure;
+use Hyperf\Database\ConnectionResolverInterface;
 use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Exceptions\DatabaseException;
 
 final class Database implements DatabaseInterface
 {
-    private object $resolver;
+    private ConnectionResolverInterface $resolver;
     private bool $debug;
 
-    public function __construct(object $resolver, bool $debug = false)
+    public function __construct(ConnectionResolverInterface $resolver, bool $debug = false)
     {
         $this->resolver = $resolver;
         $this->debug = $debug;
@@ -48,7 +50,7 @@ final class Database implements DatabaseInterface
     public function transaction(callable $fn)
     {
         try {
-            return $this->resolver->connection()->transaction($fn);
+            return $this->resolver->connection()->transaction(Closure::fromCallable($fn));
         } catch (\Throwable $e) {
             throw $this->wrapException($e, 'transaction', []);
         }

@@ -81,11 +81,9 @@ class Router
         ];
 
         $this->routes[] = $route;
-        $index = array_key_last($this->routes);
-        if ($index !== null) {
-            $firstSegment = $this->firstSegmentForRoute($segments);
-            $this->routeIndexByFirstSegment[$firstSegment][] = $index;
-        }
+        $index = count($this->routes) - 1;
+        $firstSegment = $this->firstSegmentForRoute($segments);
+        $this->routeIndexByFirstSegment[$firstSegment][] = $index;
 
         if ($name !== null) {
             $this->namedRoutes[$name] = $route;

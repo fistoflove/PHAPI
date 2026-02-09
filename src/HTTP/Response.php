@@ -270,12 +270,12 @@ class Response
         foreach ($headers as $name => $values) {
             if (is_array($values)) {
                 foreach ($values as $value) {
-                    $this->headers[] = ['name' => $name, 'value' => (string)$value];
+                    $this->headers[] = ['name' => $name, 'value' => $value];
                 }
                 continue;
             }
 
-            $this->headers[] = ['name' => $name, 'value' => (string)$values];
+            $this->headers[] = ['name' => $name, 'value' => $values];
         }
     }
 

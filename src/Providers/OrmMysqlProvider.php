@@ -6,10 +6,10 @@ namespace PHAPI\Providers;
 
 use Hyperf\Config\Config;
 use Hyperf\Contract\ConfigInterface;
-use Hyperf\DbConnection\ConnectionFactory;
+use Hyperf\Database\Connectors\ConnectionFactory;
+use Hyperf\Database\Model\Register as ModelRegister;
 use Hyperf\DbConnection\ConnectionResolver;
 use Hyperf\DbConnection\Pool\PoolFactory;
-use Hyperf\Database\Model\Model;
 use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Core\Container;
 use PHAPI\Core\ServiceProviderInterface;
@@ -57,7 +57,7 @@ final class OrmMysqlProvider implements ServiceProviderInterface
     {
         $resolver = $app->container()->get(ConnectionResolver::class);
         try {
-            Model::setConnectionResolver($resolver);
+            ModelRegister::setConnectionResolver($resolver);
         } catch (\Throwable $e) {
             error_log('PHAPI ORM MySQL: failed to set model connection resolver: ' . $e->getMessage());
         }

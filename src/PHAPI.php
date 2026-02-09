@@ -6,6 +6,7 @@ namespace PHAPI;
 
 use PHAPI\Auth\AuthManager;
 use PHAPI\Auth\AuthMiddleware;
+use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Core\AppBootstrapper;
 use PHAPI\Core\AuthConfigurator;
 use PHAPI\Core\ConfigLoader;
@@ -15,14 +16,13 @@ use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
-use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
+use PHAPI\Routing\Route as RouteLoader;
 use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\SwooleDriver;
-use PHAPI\Routing\Route as RouteLoader;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
@@ -484,7 +484,10 @@ final class PHAPI
      */
     public function loadApp(?string $baseDir = null): void
     {
-        $baseDir = $baseDir ?? getcwd();
+        if ($baseDir === null) {
+            $cwd = getcwd();
+            $baseDir = $cwd !== false ? $cwd : dirname(__DIR__);
+        }
         $api = $this;
         $paths = [
             $baseDir . '/app/middlewares.php',
@@ -585,7 +588,11 @@ final class PHAPI
      */
     public function groupMiddleware($handler): self
     {
-        $this->groupMiddlewareStack[array_key_last($this->groupMiddlewareStack)][] = $this->normalizeRouteMiddleware($handler);
+        $index = array_key_last($this->groupMiddlewareStack);
+        if (!is_int($index)) {
+            throw new \RuntimeException('Invalid middleware stack state');
+        }
+        $this->groupMiddlewareStack[$index][] = $this->normalizeRouteMiddleware($handler);
         return $this;
     }
 
@@ -1252,7 +1259,7 @@ final class PHAPI
     }
 
     /**
-     * @param callable(\PHAPI\HTTP\Request): mixed|callable(\PHAPI\HTTP\Request, callable(\PHAPI\HTTP\Request): \PHAPI\HTTP\Response): mixed|string $middleware
+     * @param mixed $middleware
      * @return array<string, mixed>
      */
     private function normalizeRouteMiddleware($middleware): array

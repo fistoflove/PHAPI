@@ -341,8 +341,15 @@ class HttpKernel
         return $metadata;
     }
 
-    private function callableCacheKey(callable $callable): string
+    /**
+     * @param mixed $callable
+     */
+    private function callableCacheKey($callable): string
     {
+        if (!is_callable($callable)) {
+            return 'other:' . md5(serialize($callable));
+        }
+
         if (is_string($callable)) {
             return 'string:' . $callable;
         }
@@ -363,6 +370,10 @@ class HttpKernel
         return 'other:' . md5(serialize($callable));
     }
 
+    /**
+     * @param callable(mixed ...$args): mixed $handler
+     * @param mixed $originalHandler
+     */
     private function handlerCacheKey(callable $handler, $originalHandler = null): string
     {
         if (is_string($originalHandler) && strpos($originalHandler, '@') !== false) {

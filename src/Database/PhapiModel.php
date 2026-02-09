@@ -9,9 +9,13 @@ use Hyperf\DbConnection\Model\Model;
 abstract class PhapiModel extends Model
 {
     /**
-     * @var array<int, string>
+     * @param array<string, mixed> $attributes
      */
-    protected array $guarded = [];
+    public function __construct(array $attributes = [])
+    {
+        parent::__construct($attributes);
+        $this->guard([]);
+    }
 
     public bool $timestamps = true;
 }

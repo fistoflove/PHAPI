@@ -20,7 +20,7 @@ final class SwooleDriverEmitTest extends TestCase
             ->withHeader('X-Test', 'yes');
 
         $driver = new SwooleDriver();
-        $sink = new class {
+        $sink = new class () {
             public int $status = 0;
             /** @var array<int, array{name: string, value: string, replace: bool}> */
             public array $headers = [];
