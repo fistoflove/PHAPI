@@ -265,6 +265,43 @@ joining channels.
 `swoole_settings` is passed directly to `Swoole\Server::set()`, so you can tune
 workers/concurrency through PHAPI config instead of patching runtime internals.
 
+## Swoole Worker Tuning
+
+Use `swoole_settings` in your PHAPI config to control worker/task concurrency.
+
+```php
+$api = new PHAPI([
+    'runtime' => 'swoole',
+    'swoole_settings' => [
+        'worker_num' => 2,
+        'task_worker_num' => 4,
+        'max_request' => 1000,
+    ],
+]);
+```
+
+You can also keep this in `config/phapi.php`:
+
+```php
+return [
+    'runtime' => 'swoole',
+    'swoole_settings' => [
+        'worker_num' => 2,
+        'task_worker_num' => 4,
+    ],
+];
+```
+
+Recommended starting point:
+- `worker_num`: 2 (good default for most control-plane APIs)
+- `task_worker_num`: 2-4 (when you use task dispatch)
+- `max_request`: 500-2000 (periodic worker recycle for memory hygiene)
+
+Notes:
+- PHAPI passes `swoole_settings` directly to `Swoole\Server::set()`.
+- If you do not use Swoole task dispatch, `task_worker_num` can stay unset.
+- Increase `worker_num` with available CPU; avoid setting it higher than useful core capacity.
+
 ## Task Runner (Advanced)
 
 Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
