@@ -1078,13 +1078,14 @@ final class PHAPI
     {
         if ($this->mysqlPool === null) {
             $config = $this->config['mysql'] ?? [];
+            $dsnParts = self::parseMySqlDsn(isset($config['dsn']) ? (string) $config['dsn'] : '');
             $this->mysqlPool = new MySqlPool([
-                'host' => (string)($config['host'] ?? '127.0.0.1'),
-                'port' => (int)($config['port'] ?? 3306),
+                'host' => (string)($dsnParts['host'] ?? $config['host'] ?? '127.0.0.1'),
+                'port' => (int)($dsnParts['port'] ?? $config['port'] ?? 3306),
                 'user' => (string)($config['user'] ?? 'root'),
                 'password' => (string)($config['password'] ?? ''),
-                'database' => (string)($config['database'] ?? ''),
-                'charset' => (string)($config['charset'] ?? 'utf8mb4'),
+                'database' => (string)($dsnParts['database'] ?? $config['database'] ?? ''),
+                'charset' => (string)($dsnParts['charset'] ?? $config['charset'] ?? 'utf8mb4'),
                 'timeout' => isset($config['timeout']) ? (float)$config['timeout'] : 1.0,
                 'pool_size' => (int)($config['pool_size'] ?? 5),
                 'pool_timeout' => (float)($config['pool_timeout'] ?? 1.0),
@@ -1092,6 +1093,54 @@ final class PHAPI
         }
 
         return $this->mysqlPool;
+    }
+
+    /**
+     * @return array{host?: string, port?: int, database?: string, charset?: string}
+     */
+    private static function parseMySqlDsn(string $dsn): array
+    {
+        $dsn = trim($dsn);
+        if (!str_starts_with(strtolower($dsn), 'mysql:')) {
+            return [];
+        }
+
+        $parts = [];
+        foreach (explode(';', substr($dsn, 6)) as $segment) {
+            $segment = trim($segment);
+            if ($segment === '') {
+                continue;
+            }
+
+            $pair = explode('=', $segment, 2);
+            if (count($pair) !== 2) {
+                continue;
+            }
+
+            $key = strtolower(trim($pair[0]));
+            $value = trim($pair[1]);
+            if ($key === '') {
+                continue;
+            }
+
+            $parts[$key] = $value;
+        }
+
+        $parsed = [];
+        if (isset($parts['host']) && $parts['host'] !== '') {
+            $parsed['host'] = $parts['host'];
+        }
+        if (isset($parts['port']) && is_numeric($parts['port'])) {
+            $parsed['port'] = max(1, (int) $parts['port']);
+        }
+        if (isset($parts['dbname']) && $parts['dbname'] !== '') {
+            $parsed['database'] = $parts['dbname'];
+        }
+        if (isset($parts['charset']) && $parts['charset'] !== '') {
+            $parsed['charset'] = $parts['charset'];
+        }
+
+        return $parsed;
     }
 
     /**

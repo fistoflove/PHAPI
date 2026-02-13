@@ -162,15 +162,21 @@ final class MySqlPool
             $this->config['charset']
         );
 
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_TIMEOUT => (int) $this->config['timeout'],
+        ];
+        if (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
+            /** @phpstan-ignore-next-line */
+            $options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
+        }
+
         return new PDO(
             $dsn,
             $this->config['user'],
             $this->config['password'],
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_TIMEOUT => (int)$this->config['timeout'],
-            ]
+            $options
         );
     }
 

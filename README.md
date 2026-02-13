@@ -578,12 +578,24 @@ PHAPI enables coroutine hooks by default so blocking PDO I/O yields in coroutine
 $mysql = $api->mysql();
 $rows = $mysql->query('SELECT 1 AS ok');
 $mysql->execute('INSERT INTO users(name) VALUES (?)', ['Ada']);
+
+// Advanced: borrow/release pooled PDO explicitly (coroutine context only).
+$pdo = $mysql->acquire();
+try {
+    $stmt = $pdo->prepare('SELECT * FROM users WHERE id = ?');
+    $stmt->execute([1]);
+    $user = $stmt->fetch();
+} finally {
+    $mysql->releaseConnection($pdo);
+}
 ```
 
 Config:
 
 ```php
 'mysql' => [
+    // Optional: if provided, host/port/database/charset can be derived from DSN.
+    // 'dsn' => 'mysql:host=127.0.0.1;port=3306;dbname=app;charset=utf8mb4',
     'host' => '127.0.0.1',
     'port' => 3306,
     'user' => 'root',
