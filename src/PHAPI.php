@@ -233,6 +233,57 @@ final class PHAPI
     }
 
     /**
+     * Register a Swoole task-worker handler.
+     *
+     * @param callable(\Swoole\Server, int, int, mixed): mixed $handler
+     * @throws FeatureNotSupportedException
+     */
+    public function setTaskHandler(callable $handler): self
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof SwooleDriver) {
+            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
+        }
+
+        $driver->setTaskHandler($handler);
+        return $this;
+    }
+
+    /**
+     * Register a Swoole task-finish handler.
+     *
+     * @param callable(\Swoole\Server, int, mixed): void $handler
+     * @throws FeatureNotSupportedException
+     */
+    public function setTaskFinishHandler(callable $handler): self
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof SwooleDriver) {
+            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
+        }
+
+        $driver->setTaskFinishHandler($handler);
+        return $this;
+    }
+
+    /**
+     * Dispatch a payload to Swoole task workers.
+     *
+     * @param mixed $payload
+     * @return int|false
+     * @throws FeatureNotSupportedException
+     */
+    public function dispatchTask(mixed $payload)
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof SwooleDriver) {
+            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
+        }
+
+        return $driver->dispatchTask($payload);
+    }
+
+    /**
      * Register a boot hook for the active runtime.
      *
      * @param callable(): void $handler

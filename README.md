@@ -302,6 +302,26 @@ Notes:
 - If you do not use Swoole task dispatch, `task_worker_num` can stay unset.
 - Increase `worker_num` with available CPU; avoid setting it higher than useful core capacity.
 
+### Task Worker API
+
+When `task_worker_num > 0`, you can dispatch background tasks explicitly:
+
+```php
+$api->setTaskHandler(function (\Swoole\Server $server, int $taskId, int $srcWorkerId, mixed $payload) {
+    // Execute background work in task worker process.
+    return ['ok' => true, 'taskId' => $taskId, 'payload' => $payload];
+});
+
+$api->setTaskFinishHandler(function (\Swoole\Server $server, int $taskId, mixed $result): void {
+    // Handle completion in worker process (optional).
+});
+
+$api->dispatchTask([
+    'task' => 'example',
+    'payload' => ['id' => 123],
+]);
+```
+
 ## Task Runner (Advanced)
 
 Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.

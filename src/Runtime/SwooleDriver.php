@@ -54,6 +54,14 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      * @var callable(\Swoole\WebSocket\Server, mixed, self): void|null
      */
     private $webSocketHandler = null;
+    /**
+     * @var callable(\Swoole\Server, int, int, mixed): mixed|null
+     */
+    private $taskHandler = null;
+    /**
+     * @var callable(\Swoole\Server, int, mixed): void|null
+     */
+    private $taskFinishHandler = null;
 
     /**
      * Configure the Swoole server host/port and WebSocket support.
@@ -120,6 +128,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             $server = new \Swoole\WebSocket\Server($this->host, $this->port);
             $this->server = $server;
             $this->applySettings($server);
+            $this->registerTaskCallbacksIfNeeded($server);
 
             $server->on('open', function (\Swoole\WebSocket\Server $server, $request) {
                 $this->connections[$request->fd] = ['channels' => []];
@@ -172,6 +181,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         $server = new \Swoole\Http\Server($this->host, $this->port);
         $this->server = $server;
         $this->applySettings($server);
+        $this->registerTaskCallbacksIfNeeded($server);
 
         if ($this->onWorkerStartHandlers !== []) {
             $handlers = $this->onWorkerStartHandlers;
@@ -323,6 +333,46 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     }
 
     /**
+     * Register a task handler used when task workers are enabled.
+     *
+     * @param callable(\Swoole\Server, int, int, mixed): mixed $handler
+     */
+    public function setTaskHandler(callable $handler): void
+    {
+        $this->taskHandler = $handler;
+    }
+
+    /**
+     * Register a task-finish handler used when task workers are enabled.
+     *
+     * @param callable(\Swoole\Server, int, mixed): void $handler
+     */
+    public function setTaskFinishHandler(callable $handler): void
+    {
+        $this->taskFinishHandler = $handler;
+    }
+
+    /**
+     * Dispatch a background task to task workers.
+     *
+     * @param mixed $payload
+     * @return int|false
+     */
+    public function dispatchTask(mixed $payload)
+    {
+        if ($this->taskWorkerCount() <= 0) {
+            throw new \RuntimeException('Task workers are not enabled. Set task_worker_num > 0 in swoole_settings.');
+        }
+
+        $server = $this->server;
+        if (!$server instanceof \Swoole\Server) {
+            throw new \RuntimeException('Cannot dispatch task before Swoole server starts.');
+        }
+
+        return $server->task($payload);
+    }
+
+    /**
      * Subscribe a connection to a channel.
      *
      * @param int $fd
@@ -415,6 +465,88 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         }
 
         $server->set($this->settings);
+    }
+
+    private function registerTaskCallbacksIfNeeded(\Swoole\Server $server): void
+    {
+        if ($this->taskWorkerCount() <= 0) {
+            return;
+        }
+
+        $server->on('task', function (...$args) {
+            return $this->handleTaskEvent($args);
+        });
+        $server->on('finish', function (...$args): void {
+            $this->handleTaskFinishEvent($args);
+        });
+    }
+
+    private function taskWorkerCount(): int
+    {
+        $value = $this->settings['task_worker_num'] ?? 0;
+        if (is_int($value)) {
+            return max(0, $value);
+        }
+        if (is_string($value) && is_numeric($value)) {
+            return max(0, (int) $value);
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array<int, mixed> $args
+     * @return mixed
+     */
+    private function handleTaskEvent(array $args)
+    {
+        $server = $args[0] ?? null;
+        if (!$server instanceof \Swoole\Server) {
+            return null;
+        }
+
+        $taskId = 0;
+        $srcWorkerId = 0;
+        $data = null;
+
+        if (isset($args[1], $args[2], $args[3]) && is_int($args[1]) && is_int($args[2])) {
+            $taskId = $args[1];
+            $srcWorkerId = $args[2];
+            $data = $args[3];
+        } elseif (isset($args[1]) && is_object($args[1])) {
+            $task = $args[1];
+            $taskId = is_numeric($task->id ?? null) ? (int) $task->id : 0;
+            $srcWorkerId = is_numeric($task->worker_id ?? null) ? (int) $task->worker_id : 0;
+            $data = $task->data ?? null;
+        }
+
+        if ($this->taskHandler !== null) {
+            $handler = $this->taskHandler;
+            return $handler($server, $taskId, $srcWorkerId, $data);
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<int, mixed> $args
+     */
+    private function handleTaskFinishEvent(array $args): void
+    {
+        if ($this->taskFinishHandler === null) {
+            return;
+        }
+
+        $server = $args[0] ?? null;
+        if (!$server instanceof \Swoole\Server) {
+            return;
+        }
+
+        $taskId = isset($args[1]) && is_int($args[1]) ? $args[1] : 0;
+        $data = $args[2] ?? null;
+
+        $handler = $this->taskFinishHandler;
+        $handler($server, $taskId, $data);
     }
 
     protected function coroutineId(): int
