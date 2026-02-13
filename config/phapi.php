@@ -8,6 +8,11 @@ return [
     'host' => '0.0.0.0',
     'port' => 9501,
     'enable_websockets' => false,
+    // Passed directly to Swoole\Server::set().
+    'swoole_settings' => [
+        // 'worker_num' => 2,
+        // 'task_worker_num' => 4,
+    ],
     'enable_coroutine_hooks' => true,
     'default_endpoints' => [
         'monitor' => true,

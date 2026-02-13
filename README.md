@@ -233,6 +233,10 @@ Suggested naming to avoid collisions: `vendor.feature` or `feature.variant` (e.g
 $api = new PHAPI([
     'runtime' => 'swoole',
     'enable_websockets' => true,
+    'swoole_settings' => [
+        'worker_num' => 2,
+        'task_worker_num' => 4,
+    ],
 ]);
 
 $api->setWebSocketHandler(function ($server, $frame, $driver): void {
@@ -257,6 +261,9 @@ $api->get('/broadcast', function (): Response {
 
 Security: authenticate WebSocket upgrades and validate subscribe requests before
 joining channels.
+
+`swoole_settings` is passed directly to `Swoole\Server::set()`, so you can tune
+workers/concurrency through PHAPI config instead of patching runtime internals.
 
 ## Task Runner (Advanced)
 

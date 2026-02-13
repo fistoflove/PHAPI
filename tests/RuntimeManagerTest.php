@@ -18,4 +18,27 @@ final class RuntimeManagerTest extends SwooleTestCase
         $this->assertSame('swoole', $manager->driver()->name());
         $this->assertTrue($manager->driver()->isLongRunning());
     }
+
+    public function testPassesSwooleSettingsToDriver(): void
+    {
+        $manager = new RuntimeManager([
+            'runtime' => 'swoole',
+            'swoole_settings' => [
+                'worker_num' => 2,
+                'task_worker_num' => 4,
+                'max_request' => 1000,
+            ],
+        ]);
+
+        $driver = $manager->driver();
+        $this->assertInstanceOf(SwooleDriver::class, $driver);
+        $this->assertSame(
+            [
+                'worker_num' => 2,
+                'task_worker_num' => 4,
+                'max_request' => 1000,
+            ],
+            $driver->settings()
+        );
+    }
 }

@@ -15,6 +15,10 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     private int $port;
     private bool $enableWebSockets;
     private string $runtimeName;
+    /**
+     * @var array<string, bool|int|float|string>
+     */
+    private array $settings;
     private Capabilities $capabilities;
     private ?\Swoole\Server $server = null;
     private bool $started = false;
@@ -58,18 +62,21 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      * @param int $port
      * @param bool $enableWebSockets
      * @param string $runtimeName
+     * @param array<string, bool|int|float|string> $settings
      * @return void
      */
     public function __construct(
         string $host = '0.0.0.0',
         int $port = 9501,
         bool $enableWebSockets = false,
-        string $runtimeName = 'swoole'
+        string $runtimeName = 'swoole',
+        array $settings = []
     ) {
         $this->host = $host;
         $this->port = $port;
         $this->enableWebSockets = $enableWebSockets;
         $this->runtimeName = $runtimeName;
+        $this->settings = $settings;
         $this->capabilities = new Capabilities(true, $enableWebSockets, true, true);
     }
 
@@ -112,6 +119,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         if ($this->enableWebSockets) {
             $server = new \Swoole\WebSocket\Server($this->host, $this->port);
             $this->server = $server;
+            $this->applySettings($server);
 
             $server->on('open', function (\Swoole\WebSocket\Server $server, $request) {
                 $this->connections[$request->fd] = ['channels' => []];
@@ -163,6 +171,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
         $server = new \Swoole\Http\Server($this->host, $this->port);
         $this->server = $server;
+        $this->applySettings($server);
 
         if ($this->onWorkerStartHandlers !== []) {
             $handlers = $this->onWorkerStartHandlers;
@@ -217,6 +226,16 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             return $this->server;
         }
         return null;
+    }
+
+    /**
+     * Return normalized Swoole server settings used by this driver.
+     *
+     * @return array<string, bool|int|float|string>
+     */
+    public function settings(): array
+    {
+        return $this->settings;
     }
 
     /**
@@ -387,6 +406,15 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         $this->deferEvent(function () use ($workerId, $attempt): void {
             $this->deferStartProcessesForWorker($workerId, $attempt + 1);
         });
+    }
+
+    private function applySettings(\Swoole\Server $server): void
+    {
+        if ($this->settings === []) {
+            return;
+        }
+
+        $server->set($this->settings);
     }
 
     protected function coroutineId(): int
