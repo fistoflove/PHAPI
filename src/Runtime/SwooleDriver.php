@@ -407,6 +407,10 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
     protected function startProcessesForWorker(int $workerId): void
     {
+        if (!$this->hasProcessFactoriesForWorker($workerId)) {
+            return;
+        }
+
         if ($this->coroutineId() >= 0) {
             if (!class_exists('Swoole\\Timer')) {
                 $this->logProcessDeferralError('Swoole timer is required to spawn processes outside coroutines.');
@@ -438,6 +442,10 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 
     private function deferStartProcessesForWorker(int $workerId, int $attempt): void
     {
+        if (!$this->hasProcessFactoriesForWorker($workerId)) {
+            return;
+        }
+
         if ($this->coroutineId() < 0) {
             $this->startProcessesForWorkerOutsideCoroutine($workerId);
             return;
@@ -492,6 +500,11 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
         }
 
         return 0;
+    }
+
+    private function hasProcessFactoriesForWorker(int $workerId): bool
+    {
+        return isset($this->processFactoriesByWorker[$workerId]) && $this->processFactoriesByWorker[$workerId] !== [];
     }
 
     /**
