@@ -73,12 +73,22 @@ final class MySqlPool
      */
     public function withConnection(callable $callback)
     {
-        $pdo = $this->borrow();
+        $pdo = $this->acquire();
         try {
             return $callback($pdo);
         } finally {
-            $this->release($pdo);
+            $this->releaseConnection($pdo);
         }
+    }
+
+    public function acquire(): PDO
+    {
+        return $this->borrow();
+    }
+
+    public function releaseConnection(PDO $pdo): void
+    {
+        $this->release($pdo);
     }
 
     private function borrow(): PDO
