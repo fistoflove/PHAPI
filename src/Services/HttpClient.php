@@ -25,4 +25,13 @@ interface HttpClient extends HttpClientInterface
      * @return array{data: array<string, mixed>|null, status: int, body: string}
      */
     public function getJsonWithMeta(string $url): array;
+
+    /**
+     * Submit an x-www-form-urlencoded POST request and decode JSON when possible.
+     *
+     * @param string $url
+     * @param array<string, scalar|null> $form
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    public function postFormWithMeta(string $url, array $form): array;
 }

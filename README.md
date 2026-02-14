@@ -574,6 +574,10 @@ Requires Swoole. If invoked outside a coroutine, PHAPI will start one when suppo
 
 ```php
 $data = $api->http()->getJson('https://example.com/api');
+$meta = $api->http()->postFormWithMeta('https://example.com/oauth/token', [
+    'grant_type' => 'authorization_code',
+    'code' => '...',
+]);
 ```
 
 Swap the HTTP client by binding the interface:
@@ -582,7 +586,7 @@ Swap the HTTP client by binding the interface:
 $api->container()->singleton(\PHAPI\Services\HttpClient::class, MyHttpClient::class);
 ```
 
-Errors thrown by `getJson()` include HTTP status and raw body via `HttpRequestException`.
+Errors thrown by `getJson()` and `postFormWithMeta()` include HTTP status and raw body via `HttpRequestException`.
 
 ## Redis (Swoole Coroutine)
 

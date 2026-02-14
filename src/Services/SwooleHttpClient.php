@@ -10,9 +10,11 @@ class SwooleHttpClient implements HttpClient
 {
     /**
      * @param string $url
+     * @param string $method
+     * @param array<string, scalar|null> $form
      * @return array{data: array<string, mixed>|null, status: int, body: string}
      */
-    private function fetchJsonWithMeta(string $url): array
+    private function requestWithMeta(string $url, string $method, array $form = []): array
     {
         if (!class_exists('Swoole\\Coroutine\\Http\\Client')) {
             throw new HttpRequestException($url, 0, '', 'Swoole coroutine HTTP client is not available.');
@@ -33,7 +35,16 @@ class SwooleHttpClient implements HttpClient
 
         $client = new \Swoole\Coroutine\Http\Client($host, $port, $scheme === 'https');
         $client->set(['timeout' => 5]);
-        $client->get($path);
+        if ($method === 'POST') {
+            $body = http_build_query($form);
+            $client->set(['headers' => [
+                'Content-Type' => 'application/x-www-form-urlencoded',
+                'Accept' => 'application/json',
+            ]]);
+            $client->post($path, $body);
+        } else {
+            $client->get($path);
+        }
         $status = $client->statusCode;
         $body = $client->body ?? '';
         $client->close();
@@ -74,6 +85,26 @@ class SwooleHttpClient implements HttpClient
      */
     public function getJsonWithMeta(string $url): array
     {
+        return $this->runInCoroutine($url, fn (): array => $this->requestWithMeta($url, 'GET'));
+    }
+
+    /**
+     * @param string $url
+     * @param array<string, scalar|null> $form
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    public function postFormWithMeta(string $url, array $form): array
+    {
+        return $this->runInCoroutine($url, fn (): array => $this->requestWithMeta($url, 'POST', $form));
+    }
+
+    /**
+     * @param string $url
+     * @param callable(): array{data: array<string, mixed>|null, status: int, body: string} $request
+     * @return array{data: array<string, mixed>|null, status: int, body: string}
+     */
+    private function runInCoroutine(string $url, callable $request): array
+    {
         if (!class_exists('Swoole\\Coroutine')) {
             throw new HttpRequestException($url, 0, '', 'Swoole coroutines are not available.');
         }
@@ -84,9 +115,9 @@ class SwooleHttpClient implements HttpClient
             }
             $result = null;
             $error = null;
-            \Swoole\Coroutine\run(function () use ($url, &$result, &$error): void {
+            \Swoole\Coroutine\run(function () use ($request, &$result, &$error): void {
                 try {
-                    $result = $this->fetchJsonWithMeta($url);
+                    $result = $request();
                 } catch (\Throwable $e) {
                     $error = $e;
                 }
@@ -97,6 +128,6 @@ class SwooleHttpClient implements HttpClient
             return $result ?? ['data' => null, 'status' => 0, 'body' => ''];
         }
 
-        return $this->fetchJsonWithMeta($url);
+        return $request();
     }
 }

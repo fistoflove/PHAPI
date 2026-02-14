@@ -20,4 +20,18 @@ final class SwooleHttpClientTest extends SwooleTestCase
 
         $client->getJsonWithMeta('not-a-url');
     }
+
+    public function testPostFormWithMetaStartsCoroutineWhenNeeded(): void
+    {
+        if (!function_exists('Swoole\\Coroutine\\run')) {
+            $this->markTestSkipped('Swoole coroutine runner not available.');
+        }
+
+        $client = new SwooleHttpClient();
+
+        $this->expectException(HttpRequestException::class);
+        $this->expectExceptionMessage('Invalid URL');
+
+        $client->postFormWithMeta('not-a-url', ['a' => 'b']);
+    }
 }
