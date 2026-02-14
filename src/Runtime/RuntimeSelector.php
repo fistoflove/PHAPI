@@ -4,47 +4,38 @@ declare(strict_types=1);
 
 namespace PHAPI\Runtime;
 
-use PHAPI\Exceptions\FeatureNotSupportedException;
+use PHAPI\Exceptions\ConfigException;
 
 class RuntimeSelector
 {
     /**
-     * Select the appropriate runtime driver based on configuration.
+     * Select the runtime driver (Swoole only).
      *
      * @param array<string, mixed> $config
      * @return RuntimeInterface
      *
-     * @throws FeatureNotSupportedException
+     * @throws ConfigException
      */
     public static function select(array $config): RuntimeInterface
     {
-        $runtimeEnv = getenv('APP_RUNTIME');
-        $runtime = $config['runtime'] ?? (($runtimeEnv === false || $runtimeEnv === '') ? 'swoole' : $runtimeEnv);
-        if ($runtime === 'swoole') {
-            if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
-                throw new FeatureNotSupportedException('Swoole runtime requested but Swoole is not available.');
-            }
-            return self::createSwoole($config, 'swoole');
+        if (!extension_loaded('swoole') || !class_exists('Swoole\\Http\\Server')) {
+            throw new ConfigException('Swoole extension is required by PHAPI.');
         }
 
-        if ($runtime === 'portable_swoole') {
-            throw new FeatureNotSupportedException('portable_swoole runtime is no longer supported. Use runtime=swoole.');
-        }
-
-        throw new FeatureNotSupportedException("Unsupported runtime '{$runtime}'. Supported runtime: swoole.");
+        return self::createSwoole($config);
     }
 
     /**
      * @param array<string, mixed> $config
      * @return SwooleDriver
      */
-    private static function createSwoole(array $config, string $runtimeName): SwooleDriver
+    private static function createSwoole(array $config): SwooleDriver
     {
         $host = $config['host'] ?? '0.0.0.0';
         $port = (int)($config['port'] ?? 9501);
         $enableWebSockets = (bool)($config['enable_websockets'] ?? false);
         $settings = self::normalizeSwooleSettings($config['swoole_settings'] ?? []);
-        return new SwooleDriver($host, $port, $enableWebSockets, $runtimeName, $settings);
+        return new SwooleDriver($host, $port, $enableWebSockets, 'swoole', $settings);
     }
 
     /**

@@ -16,8 +16,8 @@
 - `composer lint:fix`: Apply PHP-CS-Fixer formatting.
 
 Examples:
-- `APP_RUNTIME=swoole php example.php`
-- `APP_RUNTIME=portable_swoole php bin/phapi-run example.php`
+- `php example.php`
+- `php bin/phapi-run example.php`
 
 ## Coding Style & Naming Conventions
 - PHP 8.0+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
@@ -38,5 +38,4 @@ Examples:
 - Update `README.md` whenever a change affects usage, configuration, public APIs, or examples.
 
 ## Security & Configuration Tips
-- Runtime selection uses `APP_RUNTIME` (`swoole`, `portable_swoole`).
-- Use `PHAPI_PORTABLE_SWOOLE_DIR` or `PHAPI_PORTABLE_SWOOLE_EXT` when testing portable Swoole.
+- PHAPI runtime is fixed to Swoole.

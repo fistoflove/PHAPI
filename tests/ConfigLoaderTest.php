@@ -44,7 +44,6 @@ final class ConfigLoaderTest extends TestCase
     {
         $loader = new ConfigLoader();
         $config = $loader->load([
-            'runtime' => 'swoole',
             'debug' => true,
             'jobs_log_limit' => 50,
         ]);

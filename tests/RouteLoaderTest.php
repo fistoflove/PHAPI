@@ -56,7 +56,6 @@ $api->get('/users', function (): \PHAPI\HTTP\Response {
 PHP);
 
         $api = new PHAPI([
-            'runtime' => 'swoole',
             'default_endpoints' => false,
             'app_base_dir' => $this->tmpDir,
         ]);
@@ -97,7 +96,6 @@ $api->get('/order', function (): \PHAPI\HTTP\Response {
 PHP);
 
         $api = new PHAPI([
-            'runtime' => 'swoole',
             'default_endpoints' => false,
             'app_base_dir' => $this->tmpDir,
         ]);

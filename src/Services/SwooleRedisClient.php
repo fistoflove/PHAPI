@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
-final class SwooleRedisClient
+class SwooleRedisClient
 {
     /**
      * @var array{host: string, port: int, auth: string|null, db: int|null, timeout: float}
@@ -15,6 +15,7 @@ final class SwooleRedisClient
      * @var array<int, \Redis>
      */
     private array $clients = [];
+    private ?\Redis $sharedClient = null;
 
     /**
      * @param array{host: string, port: int, auth: string|null, db: int|null, timeout: float} $config
@@ -29,27 +30,44 @@ final class SwooleRedisClient
      */
     private function connect(): \Redis
     {
-        if (!class_exists('Swoole\\Coroutine')) {
-            throw new \RuntimeException('Swoole coroutines are not available.');
-        }
-
-        $cid = \Swoole\Coroutine::getCid();
-        if ($cid < 0) {
-            throw new \RuntimeException('Redis client requires a Swoole coroutine context.');
-        }
-
         if (!class_exists('Redis')) {
             throw new \RuntimeException('ext-redis is required for Redis support.');
+        }
+
+        $cid = $this->currentCoroutineId();
+        if ($cid === null) {
+            if ($this->sharedClient instanceof \Redis && $this->isConnected($this->sharedClient)) {
+                return $this->sharedClient;
+            }
+
+            $this->sharedClient = $this->createConnectedClient();
+            return $this->sharedClient;
         }
 
         if (isset($this->clients[$cid]) && $this->isConnected($this->clients[$cid])) {
             return $this->clients[$cid];
         }
 
+        $client = $this->createConnectedClient();
+        $this->clients[$cid] = $client;
+        if (is_callable([\Swoole\Coroutine::class, 'defer'])) {
+            \Swoole\Coroutine::defer(function () use ($cid, $client): void {
+                if (isset($this->clients[$cid])) {
+                    $client->close();
+                    unset($this->clients[$cid]);
+                }
+            });
+        }
+
+        return $client;
+    }
+
+    private function createConnectedClient(): \Redis
+    {
         $client = new \Redis();
         $connected = $client->connect($this->config['host'], $this->config['port'], $this->config['timeout']);
         if ($connected === false) {
-            $message = (string)$client->getLastError();
+            $message = (string) $client->getLastError();
             $error = $message !== '' ? $message : 'Unable to connect to Redis.';
             throw new \RuntimeException($error);
         }
@@ -57,7 +75,7 @@ final class SwooleRedisClient
         $auth = $this->config['auth'];
         if ($auth !== null && $auth !== '') {
             if ($client->auth($auth) === false) {
-                $message = (string)$client->getLastError();
+                $message = (string) $client->getLastError();
                 $error = $message !== '' ? $message : 'Redis auth failed.';
                 throw new \RuntimeException($error);
             }
@@ -66,20 +84,11 @@ final class SwooleRedisClient
         $db = $this->config['db'];
         if ($db !== null) {
             if ($client->select($db) === false) {
-                $message = (string)$client->getLastError();
+                $message = (string) $client->getLastError();
                 $error = $message !== '' ? $message : 'Redis select failed.';
                 throw new \RuntimeException($error);
             }
         }
-
-        $this->clients[$cid] = $client;
-        /** @phpstan-ignore-next-line */
-        \Swoole\Coroutine::defer(function () use ($cid, $client): void {
-            if (isset($this->clients[$cid])) {
-                $client->close();
-                unset($this->clients[$cid]);
-            }
-        });
 
         return $client;
     }
@@ -169,5 +178,19 @@ final class SwooleRedisClient
     public function command(string $command, array $args = [])
     {
         return $this->connect()->rawcommand($command, ...$args);
+    }
+
+    private function currentCoroutineId(): ?int
+    {
+        if (!class_exists('Swoole\\Coroutine')) {
+            return null;
+        }
+
+        $cid = \Swoole\Coroutine::getCid();
+        if ($cid < 0) {
+            return null;
+        }
+
+        return $cid;
     }
 }

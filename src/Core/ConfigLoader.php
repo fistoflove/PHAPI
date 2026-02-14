@@ -33,12 +33,9 @@ final class ConfigLoader
             $defaults = $loaded;
         }
 
-        $runtimeEnv = getenv('APP_RUNTIME');
         $debugEnv = getenv('APP_DEBUG');
 
-        $defaults['runtime'] = ($runtimeEnv === false || $runtimeEnv === '')
-            ? ($defaults['runtime'] ?? 'swoole')
-            : $runtimeEnv;
+        $defaults['runtime'] = 'swoole';
         $defaults['debug'] = $this->parseBoolEnv($debugEnv);
 
         return $defaults;

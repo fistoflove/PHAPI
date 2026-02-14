@@ -10,7 +10,7 @@ What it demonstrates
 How to run
 
 Swoole:
-  APP_RUNTIME=swoole php examples/multi-runtime/app.php
+  php examples/full-stack/app.php
 
 Routes
 - GET /            -> basic status

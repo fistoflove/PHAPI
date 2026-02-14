@@ -9,7 +9,7 @@ class RouteBuilderTest extends SwooleTestCase
 {
     public function testValidateUpdatesRegisteredRoute(): void
     {
-        $api = new PHAPI(['runtime' => 'swoole']);
+        $api = new PHAPI();
         $api->post('/register', function (): Response {
             return Response::json(['ok' => true]);
         })->validate([

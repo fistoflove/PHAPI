@@ -8,7 +8,6 @@ use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 
 $api = new PHAPI([
-    'runtime' => 'swoole',
     'enable_websockets' => true,
 ]);
 

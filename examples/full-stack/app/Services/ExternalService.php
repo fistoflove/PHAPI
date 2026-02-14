@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHAPI\Examples\MultiRuntime\Services;
+namespace PHAPI\Examples\FullStack\Services;
 
 use PHAPI\Services\HttpClient;
 

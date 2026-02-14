@@ -11,7 +11,7 @@ class RequestContextParamsTest extends SwooleTestCase
 {
     public function testParamsAvailableFromRequestContext(): void
     {
-        $api = new PHAPI(['runtime' => 'swoole']);
+        $api = new PHAPI();
         $api->get('/bases/{id}', function (): Response {
             $request = PHAPI::request();
             return Response::json([

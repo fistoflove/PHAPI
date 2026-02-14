@@ -39,7 +39,6 @@ final class WebSocketAbstractionTest extends SwooleTestCase
     public function testOnWebSocketMessageProvidesAbstractMessageAndConnection(): void
     {
         $api = new PHAPI([
-            'runtime' => 'swoole',
             'enable_websockets' => true,
             'default_endpoints' => false,
             'debug' => false,

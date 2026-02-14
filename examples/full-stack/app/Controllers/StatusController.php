@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHAPI\Examples\MultiRuntime\Controllers;
+namespace PHAPI\Examples\FullStack\Controllers;
 
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;

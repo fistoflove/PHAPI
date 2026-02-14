@@ -20,7 +20,6 @@ final class OrmMysqlProviderTest extends SwooleTestCase
     public function testDatabaseServiceUsesResolver(): void
     {
         $api = new PHAPI([
-            'runtime' => 'swoole',
             'providers' => [OrmMysqlProvider::class],
             'orm' => [
                 'mysql' => [
@@ -60,7 +59,6 @@ final class OrmMysqlProviderTest extends SwooleTestCase
         $this->expectExceptionMessage('PHAPI ORM MySQL config requires a database name.');
 
         new PHAPI([
-            'runtime' => 'swoole',
             'providers' => [OrmMysqlProvider::class],
             'orm' => [
                 'mysql' => [

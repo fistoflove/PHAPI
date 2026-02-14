@@ -17,7 +17,6 @@ use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
 use PHAPI\Contracts\WebSocketDriverInterface;
-use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\HTTP\RouteBuilder;
@@ -31,12 +30,12 @@ use PHAPI\Server\Router;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
+use PHAPI\Services\DefaultHttpClient;
+use PHAPI\Services\DefaultTaskRunner;
+use PHAPI\Services\RedisClient;
 use PHAPI\Services\Realtime;
-use PHAPI\Services\SwooleHttpClient;
 use PHAPI\Services\WebSocketConnection;
 use PHAPI\Services\WebSocketMessage;
-use PHAPI\Services\SwooleRedisClient;
-use PHAPI\Services\SwooleTaskRunner;
 use PHAPI\Services\TaskRunner;
 
 final class PHAPI
@@ -61,16 +60,12 @@ final class PHAPI
     private JobsScheduler $jobsScheduler;
     private DefaultEndpoints $defaultEndpoints;
     private ProviderLoader $providerLoader;
-    private ?SwooleRedisClient $redisClient = null;
+    private ?RedisClient $redisClient = null;
     private ?MySqlPool $mysqlPool = null;
     /**
      * @var array<int, \PHAPI\Core\ServiceProviderInterface>
      */
     private array $providers = [];
-    /**
-     * @var callable(string, array<string, mixed>): void|null
-     */
-    private $realtimeFallback = null;
     /**
      * @var callable(\Swoole\WebSocket\Server, mixed, SwooleDriver): void|null
      */
@@ -127,10 +122,7 @@ final class PHAPI
             $this->auth,
             $this->resolveTaskRunner(),
             $this->resolveHttpClient(),
-            $this->runtimeManager->capabilities(),
-            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
-            $this->config['debug'],
-            $this->realtimeFallback,
+            $this->swooleDriver(),
             $this->webSocketHandler
         );
         $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
@@ -157,63 +149,7 @@ final class PHAPI
             $this->auth,
             $this->resolveTaskRunner(),
             $this->resolveHttpClient(),
-            $this->runtimeManager->capabilities(),
-            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
-            $this->config['debug'],
-            $this->realtimeFallback,
-            $this->webSocketHandler
-        );
-        return $this;
-    }
-
-    /**
-     * Set the runtime driver name.
-     *
-     * @param string $runtime
-     * @return self
-     */
-    public function setRuntime(string $runtime): self
-    {
-        $this->config['runtime'] = $runtime;
-        $this->runtimeManager->reconfigure($this->config);
-        $this->bootstrapper->registerCoreServices(
-            $this,
-            $this->container,
-            $this->middleware,
-            $this->jobs,
-            $this->auth,
-            $this->resolveTaskRunner(),
-            $this->resolveHttpClient(),
-            $this->runtimeManager->capabilities(),
-            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
-            $this->config['debug'],
-            $this->realtimeFallback,
-            $this->webSocketHandler
-        );
-        return $this;
-    }
-
-    /**
-     * Set a fallback callback for realtime operations when WebSockets are unavailable.
-     *
-     * @param callable(string, array<string, mixed>): void $fallback
-     * @return self
-     */
-    public function setRealtimeFallback(callable $fallback): self
-    {
-        $this->realtimeFallback = $fallback;
-        $this->bootstrapper->registerCoreServices(
-            $this,
-            $this->container,
-            $this->middleware,
-            $this->jobs,
-            $this->auth,
-            $this->resolveTaskRunner(),
-            $this->resolveHttpClient(),
-            $this->runtimeManager->capabilities(),
-            $this->runtimeManager->driver() instanceof SwooleDriver ? $this->runtimeManager->driver() : null,
-            $this->config['debug'],
-            $this->realtimeFallback,
+            $this->swooleDriver(),
             $this->webSocketHandler
         );
         return $this;
@@ -228,10 +164,7 @@ final class PHAPI
     public function setWebSocketHandler(callable $handler): self
     {
         $this->webSocketHandler = $handler;
-        $driver = $this->runtimeManager->driver();
-        if ($driver instanceof SwooleDriver) {
-            $driver->setWebSocketHandler($handler);
-        }
+        $this->swooleDriver()->setWebSocketHandler($handler);
         return $this;
     }
 
@@ -260,15 +193,10 @@ final class PHAPI
      * Register a Swoole task-worker handler.
      *
      * @param callable(\Swoole\Server, int, int, mixed): mixed $handler
-     * @throws FeatureNotSupportedException
      */
     public function setTaskHandler(callable $handler): self
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof SwooleDriver) {
-            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
-        }
-
+        $driver = $this->swooleDriver();
         $driver->setTaskHandler($handler);
         return $this;
     }
@@ -277,15 +205,10 @@ final class PHAPI
      * Register a Swoole task-finish handler.
      *
      * @param callable(\Swoole\Server, int, mixed): void $handler
-     * @throws FeatureNotSupportedException
      */
     public function setTaskFinishHandler(callable $handler): self
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof SwooleDriver) {
-            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
-        }
-
+        $driver = $this->swooleDriver();
         $driver->setTaskFinishHandler($handler);
         return $this;
     }
@@ -295,15 +218,10 @@ final class PHAPI
      *
      * @param mixed $payload
      * @return int|false
-     * @throws FeatureNotSupportedException
      */
     public function dispatchTask(mixed $payload)
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof SwooleDriver) {
-            throw new FeatureNotSupportedException('Task workers are supported only in Swoole runtime.');
-        }
-
+        $driver = $this->swooleDriver();
         return $driver->dispatchTask($payload);
     }
 
@@ -430,11 +348,8 @@ final class PHAPI
      */
     public function websocketIsEstablished(int $fd): bool
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof WebSocketDriverInterface) {
-            return false;
-        }
-
+        /** @var WebSocketDriverInterface $driver */
+        $driver = $this->swooleDriver();
         return $driver->isConnectionEstablished($fd);
     }
 
@@ -448,31 +363,23 @@ final class PHAPI
      */
     public function websocketDisconnect(int $fd, int $code = 1000, string $reason = ''): bool
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof WebSocketDriverInterface) {
-            return false;
-        }
-
+        /** @var WebSocketDriverInterface $driver */
+        $driver = $this->swooleDriver();
         return $driver->disconnect($fd, $code, $reason);
     }
 
     /**
-     * Register a background process factory (Swoole only).
+     * Register a background process factory.
      *
      * @param callable(): mixed $factory
      * @param (callable(\Swoole\Process): void)|null $onStart
      * @param int $workerId
      * @return self
      *
-     * @throws FeatureNotSupportedException
      */
     public function spawnProcess(callable $factory, ?callable $onStart = null, int $workerId = 0): self
     {
-        $driver = $this->runtimeManager->driver();
-        if (!$driver instanceof SwooleDriver) {
-            throw new FeatureNotSupportedException('Background processes are supported only in Swoole runtime.');
-        }
-
+        $driver = $this->swooleDriver();
         $driver->spawnProcess($factory, $onStart, $workerId);
         return $this;
     }
@@ -559,10 +466,10 @@ final class PHAPI
             return;
         }
         $this->enableCoroutineHooks();
-        $driver = $this->runtimeManager->driver();
+        $driver = $this->swooleDriver();
         $this->jobsScheduler->registerSwooleJobs(
             $this->jobs,
-            $driver instanceof SwooleDriver ? $driver : null,
+            $driver,
             function (callable $handler): array {
                 return $this->executeJobHandler($handler);
             }
@@ -1122,15 +1029,15 @@ final class PHAPI
     }
 
     /**
-     * Get the Swoole coroutine Redis client.
+     * Get the Redis client service.
      *
-     * @return SwooleRedisClient
+     * @return RedisClient
      */
-    public function redis(): SwooleRedisClient
+    public function redis(): RedisClient
     {
         if ($this->redisClient === null) {
             $config = $this->config['redis'] ?? [];
-            $this->redisClient = new SwooleRedisClient([
+            $this->redisClient = new RedisClient([
                 'host' => (string)($config['host'] ?? '127.0.0.1'),
                 'port' => (int)($config['port'] ?? 6379),
                 'auth' => isset($config['auth']) && $config['auth'] !== '' ? (string)$config['auth'] : null,
@@ -1418,22 +1325,24 @@ final class PHAPI
 
     private function resolveTaskRunner(): TaskRunner
     {
-        $driver = $this->runtimeManager->driver();
-        if ($driver instanceof SwooleDriver) {
-            $timeout = $this->config['task_timeout'] ?? null;
-            $timeoutValue = $timeout === null ? null : (float)$timeout;
-            return new SwooleTaskRunner($timeoutValue);
-        }
-        throw new FeatureNotSupportedException('Task runner requires Swoole runtime.');
+        $timeout = $this->config['task_timeout'] ?? null;
+        $timeoutValue = $timeout === null ? null : (float)$timeout;
+        return new DefaultTaskRunner($timeoutValue);
     }
 
     private function resolveHttpClient(): HttpClient
     {
+        return new DefaultHttpClient();
+    }
+
+    private function swooleDriver(): SwooleDriver
+    {
         $driver = $this->runtimeManager->driver();
-        if ($driver instanceof SwooleDriver) {
-            return new SwooleHttpClient();
+        if (!$driver instanceof SwooleDriver) {
+            throw new \RuntimeException('PHAPI requires Swoole runtime.');
         }
-        throw new FeatureNotSupportedException('HTTP client requires Swoole runtime.');
+
+        return $driver;
     }
 
     /**

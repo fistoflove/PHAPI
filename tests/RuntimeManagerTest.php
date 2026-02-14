@@ -11,7 +11,7 @@ final class RuntimeManagerTest extends SwooleTestCase
 {
     public function testSelectsRuntimeDriver(): void
     {
-        $manager = new RuntimeManager(['runtime' => 'swoole']);
+        $manager = new RuntimeManager([]);
 
         $this->assertInstanceOf(SwooleDriver::class, $manager->driver());
         $this->assertNotNull($manager->capabilities());
@@ -22,7 +22,6 @@ final class RuntimeManagerTest extends SwooleTestCase
     public function testPassesSwooleSettingsToDriver(): void
     {
         $manager = new RuntimeManager([
-            'runtime' => 'swoole',
             'swoole_settings' => [
                 'worker_num' => 2,
                 'task_worker_num' => 4,

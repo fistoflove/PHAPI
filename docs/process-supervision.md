@@ -14,12 +14,11 @@ After=network.target
 
 [Service]
 WorkingDirectory=/path/to/phapi
-ExecStart=/usr/bin/env APP_RUNTIME=swoole /usr/bin/php example.php
+ExecStart=/usr/bin/php example.php
 Restart=always
 RestartSec=2
 User=www-data
 Group=www-data
-Environment=APP_RUNTIME=swoole
 Environment=APP_PORT=9503
 
 [Install]
@@ -41,7 +40,7 @@ Add to `/etc/supervisor/conf.d/phapi.conf`:
 ```ini
 [program:phapi]
 directory=/path/to/phapi
-command=/usr/bin/env APP_RUNTIME=swoole /usr/bin/php example.php
+command=/usr/bin/php example.php
 autostart=true
 autorestart=true
 stopsignal=TERM
@@ -70,7 +69,6 @@ services:
       - .:/app
     command: ["php", "example.php"]
     environment:
-      APP_RUNTIME: swoole
       APP_PORT: 9503
     restart: unless-stopped
 ```

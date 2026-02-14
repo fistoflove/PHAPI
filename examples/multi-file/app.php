@@ -6,7 +6,6 @@ use PHAPI\PHAPI;
 use PHAPI\Core\Container;
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,

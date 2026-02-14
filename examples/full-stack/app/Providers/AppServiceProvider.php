@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHAPI\Examples\MultiRuntime\Providers;
+namespace PHAPI\Examples\FullStack\Providers;
 
 use PHAPI\Core\Container;
 use PHAPI\Core\ServiceProviderInterface;
-use PHAPI\Examples\MultiRuntime\Services\ExternalService;
+use PHAPI\Examples\FullStack\Services\ExternalService;
 use PHAPI\PHAPI;
 
 final class AppServiceProvider implements ServiceProviderInterface

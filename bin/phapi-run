@@ -33,12 +33,6 @@ if (!$autoloadLoaded) {
     exit(1);
 }
 
-$runtime = getenv('APP_RUNTIME') ?: 'swoole';
-if ($runtime !== 'swoole') {
-    echo "Error: Unsupported runtime '$runtime'. Supported runtime: swoole.\n";
-    exit(1);
-}
-
 if (!extension_loaded('swoole')) {
     echo "Error: Swoole extension is not loaded.\n";
     echo "Please install the native Swoole PHP extension.\n";

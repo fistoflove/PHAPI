@@ -24,7 +24,6 @@ use PHAPI\PHAPI;
 use PHAPI\HTTP\Response;
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
@@ -251,7 +250,6 @@ Suggested naming to avoid collisions: `vendor.feature` or `feature.variant` (e.g
 
 ```php
 $api = new PHAPI([
-    'runtime' => 'swoole',
     'enable_websockets' => true,
     'swoole_settings' => [
         'worker_num' => 2,
@@ -310,7 +308,6 @@ Use `swoole_settings` in your PHAPI config to control worker/task concurrency.
 
 ```php
 $api = new PHAPI([
-    'runtime' => 'swoole',
     'swoole_settings' => [
         'worker_num' => 2,
         'task_worker_num' => 4,
@@ -323,7 +320,6 @@ You can also keep this in `config/phapi.php`:
 
 ```php
 return [
-    'runtime' => 'swoole',
     'swoole_settings' => [
         'worker_num' => 2,
         'task_worker_num' => 4,
@@ -401,9 +397,9 @@ Lock modes:
 
 If a job throws, the run is recorded as `error` and the message is logged.
 
-## Runtime Selection
+## Runtime
 
-- `APP_RUNTIME=swoole` (default)
+PHAPI runs on Swoole only.
 
 PHAPI registers `/monitor` by default. Disable it if you want to provide your own handler:
 
@@ -801,14 +797,14 @@ examples/multi-file/
 
 ## Example App
 
-The full example lives at `examples/multi-runtime/app.php` and demonstrates:
+The full example lives at `examples/full-stack/app.php` and demonstrates:
 providers, DI/autowiring, class middleware, jobs, tasks, HTTP client, and
 WebSocket subscriptions.
 
 Run it with:
 
 ```bash
-APP_RUNTIME=swoole php examples/multi-runtime/app.php
+php examples/full-stack/app.php
 ```
 
 ## Examples
@@ -816,7 +812,7 @@ APP_RUNTIME=swoole php examples/multi-runtime/app.php
 - `example.php`
 - `examples/two-file/index.php`
 - `examples/multi-file/app.php`
-- `examples/multi-runtime/app.php`
+- `examples/full-stack/app.php`
 
 ## Testing PHAPI Apps
 
@@ -827,7 +823,7 @@ use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 
-$api = new PHAPI(['runtime' => 'swoole']);
+$api = new PHAPI();
 
 $api->get('/hello', fn() => Response::json(['ok' => true]));
 

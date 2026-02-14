@@ -16,6 +16,9 @@ final class MySqlPool
 
     private int $created = 0;
     private ?Channel $pool = null;
+    private ?PDO $sharedClient = null;
+    /** @var array<int, PDO> */
+    private array $coroutineClients = [];
 
     /**
      * @param array{host: string, port: int, user: string, password: string, database: string, charset: string, timeout: float, pool_size: int, pool_timeout: float} $config
@@ -86,6 +89,35 @@ final class MySqlPool
         return $this->borrow();
     }
 
+    public function current(): PDO
+    {
+        $cid = $this->currentCoroutineId();
+        if ($cid === null) {
+            return $this->borrow();
+        }
+
+        if (isset($this->coroutineClients[$cid])) {
+            return $this->coroutineClients[$cid];
+        }
+
+        $pdo = $this->borrow();
+        $this->coroutineClients[$cid] = $pdo;
+
+        if (is_callable([\Swoole\Coroutine::class, 'defer'])) {
+            \Swoole\Coroutine::defer(function () use ($cid): void {
+                if (!isset($this->coroutineClients[$cid])) {
+                    return;
+                }
+
+                $client = $this->coroutineClients[$cid];
+                unset($this->coroutineClients[$cid]);
+                $this->release($client);
+            });
+        }
+
+        return $pdo;
+    }
+
     public function releaseConnection(PDO $pdo): void
     {
         $this->release($pdo);
@@ -93,12 +125,13 @@ final class MySqlPool
 
     private function borrow(): PDO
     {
-        if (!class_exists('Swoole\\Coroutine')) {
-            throw new \RuntimeException('Swoole coroutines are not available.');
-        }
+        if ($this->currentCoroutineId() === null) {
+            if ($this->sharedClient instanceof PDO) {
+                return $this->sharedClient;
+            }
 
-        if (\Swoole\Coroutine::getCid() < 0) {
-            throw new \RuntimeException('MySQL client requires a Swoole coroutine context.');
+            $this->sharedClient = $this->createConnection();
+            return $this->sharedClient;
         }
 
         $pool = $this->pool();
@@ -118,6 +151,10 @@ final class MySqlPool
 
     private function release(PDO $pdo): void
     {
+        if ($this->currentCoroutineId() === null) {
+            return;
+        }
+
         $pool = $this->pool();
         if ($this->poolIsFull($pool)) {
             return;
@@ -195,5 +232,19 @@ final class MySqlPool
             }
             $index++;
         }
+    }
+
+    private function currentCoroutineId(): ?int
+    {
+        if (!class_exists('Swoole\\Coroutine')) {
+            return null;
+        }
+
+        $cid = \Swoole\Coroutine::getCid();
+        if ($cid < 0) {
+            return null;
+        }
+
+        return $cid;
     }
 }

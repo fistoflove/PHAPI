@@ -11,7 +11,7 @@ final class ExtendTest extends SwooleTestCase
 {
     public function testExtendRegistersSingletonByDefault(): void
     {
-        $api = new PHAPI(['runtime' => 'swoole']);
+        $api = new PHAPI();
 
         $api->extend('cache', function (Container $container): object {
             return new \stdClass();
@@ -25,7 +25,7 @@ final class ExtendTest extends SwooleTestCase
 
     public function testExtendCanRegisterTransient(): void
     {
-        $api = new PHAPI(['runtime' => 'swoole']);
+        $api = new PHAPI();
 
         $api->extend('transient', function (Container $container): object {
             return new \stdClass();

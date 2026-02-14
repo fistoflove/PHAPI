@@ -13,7 +13,6 @@ final class User extends PhapiModel
 }
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9504,
     'debug' => true,

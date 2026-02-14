@@ -7,16 +7,14 @@ namespace PHAPI\Core;
 use PHAPI\Auth\AuthManager;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
-use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\SwooleDriver;
 use PHAPI\Server\MiddlewareManager;
-use PHAPI\Services\FallbackRealtime;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
+use PHAPI\Services\RedisClient;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\RealtimeManager;
-use PHAPI\Services\SwooleRedisClient;
 use PHAPI\Services\TaskRunner;
 
 final class AppBootstrapper
@@ -38,10 +36,7 @@ final class AppBootstrapper
      * @param AuthManager $auth
      * @param TaskRunner $taskRunner
      * @param HttpClient $httpClient
-     * @param DriverCapabilities $capabilities
      * @param SwooleDriver|null $driver
-     * @param bool $debug
-     * @param callable(string, array<string, mixed>): void|null $realtimeFallback
      * @param callable(\Swoole\WebSocket\Server, mixed, SwooleDriver): void|null $webSocketHandler
      * @return void
      */
@@ -53,10 +48,7 @@ final class AppBootstrapper
         AuthManager $auth,
         TaskRunner $taskRunner,
         HttpClient $httpClient,
-        DriverCapabilities $capabilities,
         ?SwooleDriver $driver,
-        bool $debug,
-        ?callable $realtimeFallback,
         ?callable $webSocketHandler
     ): void {
         $container->set(PHAPI::class, $app);
@@ -64,7 +56,7 @@ final class AppBootstrapper
         $container->set(HttpClient::class, $httpClient);
         $container->set(AuthManager::class, $auth);
         $container->set('auth', $auth);
-        $container->singleton(SwooleRedisClient::class, static function () use ($app) {
+        $container->singleton(RedisClient::class, static function () use ($app) {
             return $app->redis();
         });
         $container->singleton(MySqlPool::class, static function () use ($app) {
@@ -73,12 +65,7 @@ final class AppBootstrapper
 
         $this->authConfigurator->registerMiddleware($middleware, $auth);
 
-        $fallback = new FallbackRealtime($debug, $realtimeFallback);
-        $container->set(Realtime::class, new RealtimeManager(
-            $capabilities,
-            $driver,
-            $fallback
-        ));
+        $container->set(Realtime::class, new RealtimeManager($driver));
 
         if ($driver instanceof SwooleDriver && $webSocketHandler !== null) {
             $driver->setWebSocketHandler($webSocketHandler);

@@ -39,7 +39,6 @@ use PHAPI\PHAPI;
 use PHAPI\HTTP\Response;
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9501,
     'debug' => true,
@@ -334,14 +333,9 @@ $api = new PHAPI([
 - `composer phpstan`: static analysis.
 - `composer lint`: PHP-CS-Fixer dry-run.
 
-## Runtime selection
+## Runtime
 
-Set `APP_RUNTIME` to choose runtime:
-
-```bash
-APP_RUNTIME=swoole php example.php
-APP_RUNTIME=swoole php example.php
-```
+PHAPI runtime is fixed to Swoole.
 
 ---
 

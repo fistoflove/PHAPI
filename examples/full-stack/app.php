@@ -3,11 +3,10 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use PHAPI\PHAPI;
-use PHAPI\Examples\MultiRuntime\Providers\AppServiceProvider;
-use PHAPI\Runtime\SwooleDriver;
+use PHAPI\Examples\FullStack\Providers\AppServiceProvider;
 
 spl_autoload_register(function (string $class): void {
-    $prefix = 'PHAPI\\Examples\\MultiRuntime\\';
+    $prefix = 'PHAPI\\Examples\\FullStack\\';
     $baseDir = __DIR__ . '/app/';
     if (strncmp($class, $prefix, strlen($prefix)) !== 0) {
         return;
@@ -20,7 +19,6 @@ spl_autoload_register(function (string $class): void {
 });
 
 $api = new PHAPI([
-    'runtime' => getenv('APP_RUNTIME') ?: 'swoole',
     'host' => '0.0.0.0',
     'port' => 9503,
     'debug' => true,
@@ -69,7 +67,7 @@ $api->onShutdown(function (): void {
 });
 
 $runtime = $api->runtime();
-if ($runtime->supportsWebSockets() && $runtime instanceof SwooleDriver) {
+if ($runtime->supportsWebSockets()) {
     $api->spawnProcess(function () {
         return new \Swoole\Process(function ($process) {
             while (true) {

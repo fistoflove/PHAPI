@@ -1,7 +1,7 @@
 <?php
 
-use PHAPI\Examples\MultiRuntime\Controllers\StatusController;
-use PHAPI\Examples\MultiRuntime\Services\ExternalService;
+use PHAPI\Examples\FullStack\Controllers\StatusController;
+use PHAPI\Examples\FullStack\Services\ExternalService;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 

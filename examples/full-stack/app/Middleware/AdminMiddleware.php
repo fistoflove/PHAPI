@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHAPI\Examples\MultiRuntime\Middleware;
+namespace PHAPI\Examples\FullStack\Middleware;
 
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;

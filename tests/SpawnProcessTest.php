@@ -10,7 +10,7 @@ final class SpawnProcessTest extends SwooleTestCase
 {
     public function testSpawnProcessThrowsOnInvalidFactory(): void
     {
-        $api = new PHAPI(['runtime' => 'swoole']);
+        $api = new PHAPI();
 
         $api->spawnProcess(function () {
             return new \stdClass();
