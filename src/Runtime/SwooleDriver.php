@@ -369,7 +369,34 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             throw new \RuntimeException('Cannot dispatch task before Swoole server starts.');
         }
 
-        return $server->task($payload);
+        /** @var int|false $taskId */
+        $taskId = $server->task($payload);
+        return $taskId;
+    }
+
+    /**
+     * Send a payload to a specific WebSocket connection.
+     *
+     * @param int $fd
+     * @param string $payload
+     * @return bool
+     */
+    public function send(int $fd, string $payload): bool
+    {
+        $server = $this->websocketServer();
+        if (!$server instanceof \Swoole\WebSocket\Server) {
+            return false;
+        }
+
+        if (!$this->isConnectionEstablished($fd)) {
+            return false;
+        }
+
+        try {
+            return call_user_func([$server, 'push'], $fd, $payload);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     /**
@@ -403,6 +430,107 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             return;
         }
         unset($this->connections[$fd]['channels'][$channel]);
+    }
+
+    /**
+     * Determine if a WebSocket connection is currently established.
+     *
+     * @param int $fd
+     * @return bool
+     */
+    public function isConnectionEstablished(int $fd): bool
+    {
+        $server = $this->websocketServer();
+        if (!$server instanceof \Swoole\WebSocket\Server) {
+            return false;
+        }
+
+        if (is_callable([$server, 'isEstablished'])) {
+            return (bool) $server->isEstablished($fd);
+        }
+
+        if (is_callable([$server, 'exist'])) {
+            return (bool) $server->exist($fd);
+        }
+
+        return false;
+    }
+
+    /**
+     * Disconnect an established WebSocket connection.
+     *
+     * @param int $fd
+     * @param int $code
+     * @param string $reason
+     * @return bool
+     */
+    public function disconnect(int $fd, int $code = 1000, string $reason = ''): bool
+    {
+        $server = $this->websocketServer();
+        if (!$server instanceof \Swoole\WebSocket\Server) {
+            return false;
+        }
+
+        if (!$this->isConnectionEstablished($fd)) {
+            return false;
+        }
+
+        if (!is_callable([$server, 'disconnect'])) {
+            return false;
+        }
+
+        try {
+            return (bool) call_user_func([$server, 'disconnect'], $fd, $code, $reason);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * Register a recurring timer.
+     *
+     * @param int $intervalMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function every(int $intervalMs, callable $handler)
+    {
+        if ($intervalMs < 1) {
+            throw new \InvalidArgumentException('Timer interval must be at least 1ms.');
+        }
+
+        return $this->timerTick($intervalMs, $handler);
+    }
+
+    /**
+     * Register a one-shot timer.
+     *
+     * @param int $delayMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function after(int $delayMs, callable $handler)
+    {
+        if ($delayMs < 1) {
+            throw new \InvalidArgumentException('Timer delay must be at least 1ms.');
+        }
+
+        return $this->timerAfter($delayMs, $handler);
+    }
+
+    /**
+     * Clear a timer id.
+     *
+     * @param int $timerId
+     * @return bool
+     */
+    public function clearTimer(int $timerId): bool
+    {
+        if ($timerId <= 0) {
+            return false;
+        }
+
+        return $this->timerClear($timerId);
     }
 
     protected function startProcessesForWorker(int $workerId): void
@@ -472,7 +600,11 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
             return;
         }
 
-        $server->set($this->settings);
+        if (!is_callable([$server, 'set'])) {
+            return;
+        }
+
+        call_user_func([$server, 'set'], $this->settings);
     }
 
     private function registerTaskCallbacksIfNeeded(\Swoole\Server $server): void
@@ -508,7 +640,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     }
 
     /**
-     * @param array<int, mixed> $args
+     * @param array<int|string, mixed> $args
      * @return mixed
      */
     private function handleTaskEvent(array $args)
@@ -542,7 +674,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     }
 
     /**
-     * @param array<int, mixed> $args
+     * @param array<int|string, mixed> $args
      */
     private function handleTaskFinishEvent(array $args): void
     {
@@ -575,8 +707,7 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
      */
     protected function deferTimer(callable $callback): void
     {
-        /** @phpstan-ignore-next-line */
-        \Swoole\Timer::after(1, $callback);
+        $this->timerAfter(1, $callback);
     }
 
     /**
@@ -590,6 +721,45 @@ class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
     protected function logProcessDeferralError(string $message): void
     {
         error_log('PHAPI: ' . $message);
+    }
+
+    /**
+     * @param int $intervalMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    protected function timerTick(int $intervalMs, callable $handler)
+    {
+        if (!class_exists('Swoole\\Timer')) {
+            throw new \RuntimeException('Swoole timer support is not available.');
+        }
+
+        return \Swoole\Timer::tick($intervalMs, $handler);
+    }
+
+    /**
+     * @param int $delayMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    protected function timerAfter(int $delayMs, callable $handler)
+    {
+        if (!class_exists('Swoole\\Timer')) {
+            throw new \RuntimeException('Swoole timer support is not available.');
+        }
+
+        /** @phpstan-ignore-next-line */
+        return \Swoole\Timer::after($delayMs, $handler);
+    }
+
+    protected function timerClear(int $timerId): bool
+    {
+        if (!class_exists('Swoole\\Timer')) {
+            throw new \RuntimeException('Swoole timer support is not available.');
+        }
+
+        \Swoole\Timer::clear($timerId);
+        return true;
     }
 
     /**

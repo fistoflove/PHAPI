@@ -16,6 +16,7 @@ use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
+use PHAPI\Contracts\WebSocketDriverInterface;
 use PHAPI\Exceptions\FeatureNotSupportedException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
@@ -32,6 +33,8 @@ use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\SwooleHttpClient;
+use PHAPI\Services\WebSocketConnection;
+use PHAPI\Services\WebSocketMessage;
 use PHAPI\Services\SwooleRedisClient;
 use PHAPI\Services\SwooleTaskRunner;
 use PHAPI\Services\TaskRunner;
@@ -233,6 +236,27 @@ final class PHAPI
     }
 
     /**
+     * Register a runtime-abstracted WebSocket message handler.
+     *
+     * @param callable(WebSocketMessage, WebSocketConnection): void $handler
+     * @return self
+     */
+    public function onWebSocketMessage(callable $handler): self
+    {
+        return $this->setWebSocketHandler(function ($server, $frame, $driver) use ($handler): void {
+            $fd = (int) ($frame->fd ?? 0);
+            if ($fd <= 0) {
+                return;
+            }
+
+            /** @var WebSocketDriverInterface $driver */
+            $message = new WebSocketMessage($fd, (string) ($frame->data ?? ''));
+            $connection = new WebSocketConnection($driver, $fd);
+            $handler($message, $connection);
+        });
+    }
+
+    /**
      * Register a Swoole task-worker handler.
      *
      * @param callable(\Swoole\Server, int, int, mixed): mixed $handler
@@ -361,6 +385,75 @@ final class PHAPI
     public function runtime(): \PHAPI\Runtime\RuntimeInterface
     {
         return $this->runtimeManager->driver();
+    }
+
+    /**
+     * Register a recurring runtime timer.
+     *
+     * @param int $intervalMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function every(int $intervalMs, callable $handler)
+    {
+        return $this->runtimeManager->driver()->every($intervalMs, $handler);
+    }
+
+    /**
+     * Register a one-shot runtime timer.
+     *
+     * @param int $delayMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function after(int $delayMs, callable $handler)
+    {
+        return $this->runtimeManager->driver()->after($delayMs, $handler);
+    }
+
+    /**
+     * Clear a runtime timer id.
+     *
+     * @param int $timerId
+     * @return bool
+     */
+    public function clearTimer(int $timerId): bool
+    {
+        return $this->runtimeManager->driver()->clearTimer($timerId);
+    }
+
+    /**
+     * Determine whether a WebSocket connection is established.
+     *
+     * @param int $fd
+     * @return bool
+     */
+    public function websocketIsEstablished(int $fd): bool
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof WebSocketDriverInterface) {
+            return false;
+        }
+
+        return $driver->isConnectionEstablished($fd);
+    }
+
+    /**
+     * Disconnect a WebSocket connection when supported by the runtime.
+     *
+     * @param int $fd
+     * @param int $code
+     * @param string $reason
+     * @return bool
+     */
+    public function websocketDisconnect(int $fd, int $code = 1000, string $reason = ''): bool
+    {
+        $driver = $this->runtimeManager->driver();
+        if (!$driver instanceof WebSocketDriverInterface) {
+            return false;
+        }
+
+        return $driver->disconnect($fd, $code, $reason);
     }
 
     /**

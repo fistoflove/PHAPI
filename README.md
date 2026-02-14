@@ -126,6 +126,26 @@ $runtime = $api->runtime();
 $runtime->name(); // swoole
 $runtime->supportsWebSockets();
 $runtime->isLongRunning();
+
+$timerId = $runtime->every(1000, function (): void {
+    // recurring work
+});
+
+$runtime->after(250, function (): void {
+    // one-shot work
+});
+
+$runtime->clearTimer($timerId);
+```
+
+PHAPI also exposes timer helpers directly:
+
+```php
+$timerId = $api->every(1000, function (): void {
+});
+$api->after(250, function (): void {
+});
+$api->clearTimer($timerId);
 ```
 
 ## Public Contracts
@@ -239,14 +259,15 @@ $api = new PHAPI([
     ],
 ]);
 
-$api->setWebSocketHandler(function ($server, $frame, $driver): void {
-    $payload = json_decode($frame->data ?? '', true);
-    if (!is_array($payload)) {
+$api->onWebSocketMessage(function (\PHAPI\Services\WebSocketMessage $message, \PHAPI\Services\WebSocketConnection $conn): void {
+    $payload = $message->json();
+    if ($payload === null) {
         return;
     }
 
-    if ($payload['action'] === 'subscribe') {
-        $driver->subscribe($frame->fd, (string)$payload['channel']);
+    if (($payload['action'] ?? '') === 'subscribe') {
+        $conn->subscribe((string) ($payload['channel'] ?? ''));
+        $conn->send(['event' => 'subscribed']);
     }
 });
 
@@ -256,14 +277,32 @@ $api->get('/broadcast', function (): Response {
 });
 ```
 
-`$driver` is the active Swoole runtime driver. It manages subscriptions via
-`subscribe($fd, $channel)` / `unsubscribe($fd, $channel)` and broadcasts only to subscribers.
+`WebSocketConnection` provides runtime-abstracted helpers:
+- `subscribe()` / `unsubscribe()`
+- `send()`
+- `isEstablished()`
+- `disconnect()`
+
+If low-level server/frame access is needed, `setWebSocketHandler(...)` remains available.
 
 Security: authenticate WebSocket upgrades and validate subscribe requests before
 joining channels.
 
 `swoole_settings` is passed directly to `Swoole\Server::set()`, so you can tune
 workers/concurrency through PHAPI config instead of patching runtime internals.
+
+WebSocket connection control is available without raw Swoole server methods:
+
+```php
+$api->onWebSocketMessage(function (\PHAPI\Services\WebSocketMessage $message, \PHAPI\Services\WebSocketConnection $conn): void {
+    if (!$conn->isEstablished()) {
+        return;
+    }
+
+    // Optional explicit disconnect path
+$conn->disconnect(1000, 'done');
+});
+```
 
 ## Swoole Worker Tuning
 

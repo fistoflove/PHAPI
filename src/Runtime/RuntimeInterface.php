@@ -68,4 +68,30 @@ interface RuntimeInterface extends PublicRuntimeInterface, HttpRuntimeDriver
      * @return void
      */
     public function onShutdown(callable $handler): void;
+
+    /**
+     * Register a recurring runtime timer.
+     *
+     * @param int $intervalMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function every(int $intervalMs, callable $handler);
+
+    /**
+     * Register a one-shot runtime timer.
+     *
+     * @param int $delayMs
+     * @param callable(): void $handler
+     * @return int|false
+     */
+    public function after(int $delayMs, callable $handler);
+
+    /**
+     * Clear a previously registered timer.
+     *
+     * @param int $timerId
+     * @return bool
+     */
+    public function clearTimer(int $timerId): bool;
 }

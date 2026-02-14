@@ -168,7 +168,6 @@ final class MySqlPool
             PDO::ATTR_TIMEOUT => (int) $this->config['timeout'],
         ];
         if (defined('PDO::MYSQL_ATTR_USE_BUFFERED_QUERY')) {
-            /** @phpstan-ignore-next-line */
             $options[PDO::MYSQL_ATTR_USE_BUFFERED_QUERY] = true;
         }
 
