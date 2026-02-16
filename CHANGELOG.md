@@ -2,6 +2,15 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.1.0 — 2026-02-16
+
+### Added
+
+- Custom header support on all HttpClient methods (`getJson`, `getJsonWithMeta`, `postFormWithMeta`) via optional `array $headers` parameter
+- New `postJson(string $url, array $data, array $headers = [])` method for posting JSON-encoded data with decoded response
+- New `postJsonWithMeta(string $url, array $data, array $headers = [])` method for posting JSON-encoded data with response metadata
+- Custom headers are merged with defaults; caller-supplied headers override built-in defaults
+
 ## v1.0.0 — 2026-02-14
 
 First stable release. This tag marks the version consumed by Yard (control plane),
