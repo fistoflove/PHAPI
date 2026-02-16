@@ -26,8 +26,11 @@ class ClassHandlerTest extends TestCase
         );
 
         $response = $kernel->handle(new Request('GET', '/hello'));
-        $payload = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
 
+        $this->assertSame(200, $response->status());
+        $this->assertSame('application/json', $response->headers()['Content-Type'] ?? null);
+
+        $payload = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
         $this->assertSame(['hello' => 'world'], $payload);
     }
 }

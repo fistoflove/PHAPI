@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHAPI\Tests;
 
 use PHAPI\Core\ConfigLoader;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class ConfigLoaderTest extends TestCase
@@ -53,47 +54,31 @@ final class ConfigLoaderTest extends TestCase
         $this->assertSame(50, $config['jobs_log_limit']);
     }
 
-    public function testDebugEnvZeroIsFalse(): void
+    /**
+     * @return iterable<string, array{string|null, bool}>
+     */
+    public static function debugEnvProvider(): iterable
     {
-        putenv('APP_DEBUG=0');
-        $_ENV['APP_DEBUG'] = '0';
-
-        $loader = new ConfigLoader();
-        $defaults = $loader->defaults();
-
-        $this->assertFalse($defaults['debug']);
+        yield 'zero' => ['0', false];
+        yield 'one' => ['1', true];
+        yield 'banana' => ['banana', false];
+        yield 'unset' => [null, false];
     }
 
-    public function testDebugEnvOneIsTrue(): void
+    #[DataProvider('debugEnvProvider')]
+    public function testDebugEnvResolution(?string $envValue, bool $expected): void
     {
-        putenv('APP_DEBUG=1');
-        $_ENV['APP_DEBUG'] = '1';
+        if ($envValue === null) {
+            putenv('APP_DEBUG');
+            unset($_ENV['APP_DEBUG']);
+        } else {
+            putenv('APP_DEBUG=' . $envValue);
+            $_ENV['APP_DEBUG'] = $envValue;
+        }
 
         $loader = new ConfigLoader();
         $defaults = $loader->defaults();
 
-        $this->assertTrue($defaults['debug']);
-    }
-
-    public function testDebugEnvUnsetIsFalse(): void
-    {
-        putenv('APP_DEBUG');
-        unset($_ENV['APP_DEBUG']);
-
-        $loader = new ConfigLoader();
-        $defaults = $loader->defaults();
-
-        $this->assertFalse($defaults['debug']);
-    }
-
-    public function testDebugEnvInvalidValueIsFalse(): void
-    {
-        putenv('APP_DEBUG=banana');
-        $_ENV['APP_DEBUG'] = 'banana';
-
-        $loader = new ConfigLoader();
-        $defaults = $loader->defaults();
-
-        $this->assertFalse($defaults['debug']);
+        $this->assertSame($expected, $defaults['debug']);
     }
 }

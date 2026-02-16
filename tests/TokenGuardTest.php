@@ -19,12 +19,19 @@ class TokenGuardTest extends TestCase
 
         $req1 = new Request('GET', '/', [], ['authorization' => 'Bearer alpha']);
         RequestContext::set($req1);
+        $this->assertTrue($guard->check());
         $this->assertSame('alpha', $guard->id());
+        $this->assertSame(['id' => 'alpha'], $guard->user());
 
         $req2 = new Request('GET', '/', [], ['authorization' => 'Bearer beta']);
         RequestContext::set($req2);
+        $this->assertTrue($guard->check());
         $this->assertSame('beta', $guard->id());
+        $this->assertSame(['id' => 'beta'], $guard->user());
 
         RequestContext::clear();
+        $this->assertFalse($guard->check());
+        $this->assertNull($guard->id());
+        $this->assertNull($guard->user());
     }
 }

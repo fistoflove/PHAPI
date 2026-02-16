@@ -49,7 +49,12 @@ final class HttpKernelIntegrationTest extends TestCase
         $response = $kernel->handle($request);
 
         $this->assertSame(422, $response->status());
+        $this->assertSame('application/json', $response->headers()['Content-Type'] ?? null);
+
         $payload = json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('error', $payload);
+        $this->assertArrayHasKey('errors', $payload);
         $this->assertSame('Validation failed', $payload['error']);
         $this->assertArrayHasKey('email', $payload['errors']);
     }
