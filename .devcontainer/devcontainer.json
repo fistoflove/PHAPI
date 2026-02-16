@@ -1,0 +1,9 @@
+{
+	"name": "PHAPI",
+	"build": {
+		"context": ".",
+		"dockerfile": "Dockerfile"
+	},
+	"postCreateCommand": "composer install",
+	"postStartCommand": "redis-server --daemonize yes --loglevel warning && mysqld_safe & sleep 2 && mysql -u root -e \"CREATE DATABASE IF NOT EXISTS phapi_test; CREATE USER IF NOT EXISTS 'phapi'@'127.0.0.1' IDENTIFIED BY 'phapi_pass'; GRANT ALL ON phapi_test.* TO 'phapi'@'127.0.0.1'; FLUSH PRIVILEGES;\" 2>/dev/null || true"
+}

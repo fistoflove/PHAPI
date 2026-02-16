@@ -119,6 +119,6 @@ class TaskManager
             'name' => $name,
             'has_data' => !is_null($data),
         ]);
-        return $server->task(['name' => $name, 'data' => $data]);
+        return $server->task(['name' => $name, 'data' => $data]) !== false;
     }
 }

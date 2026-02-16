@@ -70,32 +70,39 @@ class HttpKernel
         $start = microtime(true);
         $requestId = $request->header('x-request-id') ?? bin2hex(random_bytes(8));
         try {
-            $match = $this->router->match($request->method(), $request->path(), $request->host());
-            $route = $match['route'];
-            if ($route === null) {
-                if ($match['allowed'] !== []) {
-                    throw new MethodNotAllowedException($match['allowed']);
+            // Global middleware wraps routing so it can intercept requests
+            // (e.g. CORS preflight) before the router rejects the method.
+            $routeAndDispatch = function (Request $req): Response {
+                $match = $this->router->match($req->method(), $req->path(), $req->host());
+                $route = $match['route'];
+                if ($route === null) {
+                    if ($match['allowed'] !== []) {
+                        throw new MethodNotAllowedException($match['allowed']);
+                    }
+                    throw new RouteNotFoundException($req->path(), $req->method());
                 }
-                throw new RouteNotFoundException($request->path(), $request->method());
-            }
 
-            $request = $request->withParams($route['matchedParams'] ?? []);
-            RequestContext::set($request);
+                $req = $req->withParams($route['matchedParams'] ?? []);
+                RequestContext::set($req);
 
-            if ($route['validation'] !== null) {
-                $this->runValidation($route, $request);
-            }
+                if ($route['validation'] !== null) {
+                    $this->runValidation($route, $req);
+                }
 
-            $middlewareStack = array_merge(
-                $this->middleware->globalStack(),
-                $this->middleware->resolveRouteMiddleware($route['middleware'])
-            );
+                $routeMiddleware = $this->middleware->resolveRouteMiddleware($route['middleware']);
 
-            $coreHandler = function (Request $req) use ($route): Response {
-                return $this->dispatch($route['handler'], $req);
+                $coreHandler = function (Request $r) use ($route): Response {
+                    return $this->dispatch($route['handler'], $r);
+                };
+
+                return $this->runMiddlewareStack($routeMiddleware, $req, $coreHandler);
             };
 
-            $response = $this->runMiddlewareStack($middlewareStack, $request, $coreHandler);
+            $response = $this->runMiddlewareStack(
+                $this->middleware->globalStack(),
+                $request,
+                $routeAndDispatch
+            );
             $response = $this->middleware->applyAfter($request, $response);
         } catch (\Throwable $e) {
             $response = $this->errorHandler->handle($e, $request);

@@ -78,7 +78,9 @@ final class OrmMysqlProvider implements ServiceProviderInterface
         /** @var array<string, mixed>|null $orm */
         $orm = $config['orm']['mysql'] ?? null;
 
-        if ($orm === null) {
+        // Fall back to the mysql key when orm.mysql exists but has no database
+        // configured (e.g. only default values from config/phapi.php).
+        if ($orm === null || !isset($orm['database']) || $orm['database'] === '') {
             /** @var array<string, mixed> $mysql */
             $mysql = $config['mysql'] ?? [];
             $poolSize = isset($mysql['pool_size']) ? (int)$mysql['pool_size'] : (int)$defaults['pool']['max_connections'];
