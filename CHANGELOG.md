@@ -2,6 +2,14 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.2.0 — 2026-02-16
+
+### Added
+- `ResponseEnvelope` class (`PHAPI\HTTP\ResponseEnvelope`) for canonical API response formatting
+  - `success(mixed $data): array` — builds `{"ok": true, "data": $data}` envelope
+  - `error(string $code, string $message, int $httpStatus = 400): Response` — builds error response with `{"ok": false, "error": {"code": "...", "message": "..."}}`
+  - `ok(mixed $data, int $httpStatus = 200): Response` — builds success response with the envelope
+
 ## v1.1.0 — 2026-02-16
 
 ### Added
