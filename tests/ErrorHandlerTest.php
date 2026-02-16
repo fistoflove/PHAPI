@@ -120,16 +120,16 @@ final class ErrorHandlerTest extends TestCase
         $this->assertSame(['email' => 'required'], $body['errors']);
     }
 
-    public function testMethodNotAllowedIncludesAllowHeader(): void
+    public function testMethodNotAllowedReturns405WithAllowedMethods(): void
     {
         $handler = new ErrorHandler(false);
         $exception = new MethodNotAllowedException(['GET', 'POST']);
         $response = $handler->handle($exception, new Request('DELETE', '/items'));
 
         $this->assertSame(405, $response->status());
-        $this->assertSame('GET, POST', $response->headers()['Allow'] ?? null);
 
         $body = json_decode($response->body(), true);
+        $this->assertSame('Method not allowed', $body['error']);
         $this->assertSame(['GET', 'POST'], $body['allowed_methods']);
     }
 

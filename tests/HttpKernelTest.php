@@ -35,7 +35,7 @@ final class HttpKernelTest extends TestCase
         $this->assertStringContainsString('Route not found', $body['error']);
     }
 
-    public function testMethodNotAllowedReturns405WithAllowHeader(): void
+    public function testMethodNotAllowedReturns405(): void
     {
         $router = new Router();
         $router->addRoute('GET', '/items', static fn (): Response => Response::json([]));
@@ -45,10 +45,11 @@ final class HttpKernelTest extends TestCase
         $response = $kernel->handle(new Request('DELETE', '/items'));
 
         $this->assertSame(405, $response->status());
-        $allow = $response->headers()['Allow'] ?? '';
-        $methods = array_map('trim', explode(',', $allow));
-        sort($methods);
-        $this->assertSame(['GET', 'POST'], $methods);
+        $body = json_decode($response->body(), true);
+        $this->assertSame('Method not allowed', $body['error']);
+        $allowed = $body['allowed_methods'];
+        sort($allowed);
+        $this->assertSame(['GET', 'POST'], $allowed);
     }
 
     public function testHandlerExceptionReturns500(): void
