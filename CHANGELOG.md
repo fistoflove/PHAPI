@@ -2,6 +2,13 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.3.0 — 2026-02-16
+
+### Added
+- Docker Compose development environment with Swoole app, MySQL 8.0, and Redis 7 services
+- `docker/Dockerfile` for containerized development and CI
+- `.dockerignore` for optimized image builds
+
 ## v1.2.0 — 2026-02-16
 
 ### Added

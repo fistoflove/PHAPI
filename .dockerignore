@@ -1,0 +1,10 @@
+vendor/
+var/
+.git/
+.devcontainer/
+portable-swoole/
+docs/
+examples/
+*.md
+!composer.json
+!composer.lock
