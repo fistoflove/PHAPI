@@ -10,7 +10,7 @@ PHAPI is a lightweight PHP 8.0+ micro MVC framework built exclusively on Swoole.
 
 ```bash
 composer test                    # PHPUnit suite with testdox output
-composer test:integration        # Integration tests only (@integration group)
+composer test:integration        # Integration tests only (@integration group, includes OpenFGA)
 composer phpstan                 # PHPStan level 8 strict analysis (src/ only)
 composer lint                    # PHP-CS-Fixer dry-run check
 composer lint:fix                # Apply PHP-CS-Fixer formatting
@@ -69,6 +69,8 @@ Config (`config/phapi.php`):
 Methods: `check(user, relation, object): bool`, `batchCheck(checks): array`, `writeTuples(writes): void`, `deleteTuples(deletes): void`, `readTuples(?user, ?relation, ?object): array`, `listObjects(user, relation, type): array`, `listUsers(object, relation, userType): array`, `expand(relation, object): array`, `writeAuthorizationModel(typeDefinitions, schemaVersion): string`, `readAuthorizationModel(?id): array`.
 
 Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
+
+20 unit tests (MockHttpClient, no Swoole needed) + 14 integration tests (`@group openfga`, require Docker OpenFGA instance). Integration tests cover all 10 `OpenFgaClient` methods including transitive userset resolution.
 
 **Testing approach**: Use `PHAPI::kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
 

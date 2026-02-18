@@ -271,6 +271,127 @@ final class OpenFgaClientIntegrationTest extends TestCase
         $this->assertNotEmpty($tree);
     }
 
+    public function testListUsersForObject(): void
+    {
+        $client = $this->createClient();
+
+        $client->writeTuples([
+            ['user' => 'user:grace', 'relation' => 'viewer', 'object' => 'document:shared'],
+            ['user' => 'user:heidi', 'relation' => 'viewer', 'object' => 'document:shared'],
+            ['user' => 'user:ivan', 'relation' => 'editor', 'object' => 'document:shared'],
+        ]);
+
+        $viewers = $client->listUsers('document:shared', 'viewer', 'user');
+
+        $this->assertContains('user:grace', $viewers);
+        $this->assertContains('user:heidi', $viewers);
+        $this->assertNotContains('user:ivan', $viewers);
+    }
+
+    public function testCheckWithUsersetResolution(): void
+    {
+        $client = $this->createClient();
+
+        // user:judy is member of org:acme, org:acme is the org of document:roadmap
+        // → judy should have org_viewer on document:roadmap via tupleToUserset
+        $client->writeTuples([
+            ['user' => 'user:judy', 'relation' => 'member', 'object' => 'org:acme'],
+            ['user' => 'org:acme', 'relation' => 'org', 'object' => 'document:roadmap'],
+        ]);
+
+        $this->assertTrue($client->check('user:judy', 'org_viewer', 'document:roadmap'));
+        $this->assertFalse($client->check('user:nobody', 'org_viewer', 'document:roadmap'));
+    }
+
+    public function testWriteAuthorizationModelViaClient(): void
+    {
+        $client = $this->createClient();
+
+        $modelId = $client->writeAuthorizationModel(
+            [
+                ['type' => 'user'],
+                [
+                    'type' => 'folder',
+                    'relations' => [
+                        'viewer' => ['this' => (object) []],
+                    ],
+                    'metadata' => [
+                        'relations' => [
+                            'viewer' => [
+                                'directly_related_user_types' => [
+                                    ['type' => 'user'],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            '1.1',
+        );
+
+        $this->assertNotEmpty($modelId);
+        $this->assertIsString($modelId);
+    }
+
+    public function testReadLatestAuthorizationModel(): void
+    {
+        $client = $this->createClient();
+
+        $model = $client->readAuthorizationModel(null);
+
+        $this->assertNotEmpty($model);
+        $this->assertArrayHasKey('id', $model);
+    }
+
+    public function testReadTuplesWithPartialFilters(): void
+    {
+        $client = $this->createClient();
+
+        $client->writeTuples([
+            ['user' => 'user:kate', 'relation' => 'viewer', 'object' => 'document:partial-test'],
+            ['user' => 'user:kate', 'relation' => 'editor', 'object' => 'document:partial-test'],
+        ]);
+
+        // Filter by user only
+        $byUser = $client->readTuples('user:kate', null, null);
+        $this->assertGreaterThanOrEqual(2, count($byUser));
+
+        // Filter by object only
+        $byObject = $client->readTuples(null, null, 'document:partial-test');
+        $this->assertGreaterThanOrEqual(2, count($byObject));
+
+        // Filter by relation only
+        $byRelation = $client->readTuples(null, 'viewer', null);
+        $this->assertGreaterThanOrEqual(1, count($byRelation));
+    }
+
+    public function testBatchWriteAndDeleteMultipleTuples(): void
+    {
+        $client = $this->createClient();
+
+        // Batch write 3 tuples at once
+        $client->writeTuples([
+            ['user' => 'user:liam', 'relation' => 'viewer', 'object' => 'document:batch1'],
+            ['user' => 'user:liam', 'relation' => 'viewer', 'object' => 'document:batch2'],
+            ['user' => 'user:liam', 'relation' => 'viewer', 'object' => 'document:batch3'],
+        ]);
+
+        $objects = $client->listObjects('user:liam', 'viewer', 'document');
+        $this->assertContains('document:batch1', $objects);
+        $this->assertContains('document:batch2', $objects);
+        $this->assertContains('document:batch3', $objects);
+
+        // Batch delete 2 of them
+        $client->deleteTuples([
+            ['user' => 'user:liam', 'relation' => 'viewer', 'object' => 'document:batch1'],
+            ['user' => 'user:liam', 'relation' => 'viewer', 'object' => 'document:batch2'],
+        ]);
+
+        $this->assertFalse($client->check('user:liam', 'viewer', 'document:batch1'));
+        $this->assertFalse($client->check('user:liam', 'viewer', 'document:batch2'));
+        $this->assertTrue($client->check('user:liam', 'viewer', 'document:batch3'));
+    }
+
     /**
      * @return array<string, mixed>
      */
