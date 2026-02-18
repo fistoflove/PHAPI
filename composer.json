@@ -1,6 +1,6 @@
 {
     "name": "phapi/phapi",
-    "version": "1.3.0",
+    "version": "1.4.0",
     "description": "A lightweight, high-performance wrapper for Swoole HTTP server with routing, middleware, validation, CORS, and async task support",
     "keywords": [
         "swoole",

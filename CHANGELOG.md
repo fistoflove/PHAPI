@@ -2,6 +2,18 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.4.0 — 2026-02-18
+
+### Added
+- OpenFGA authorization client (`OpenFgaClient` interface + `OpenFgaHttpClient` implementation) for Zanzibar-based fine-grained authorization
+- `OpenFgaException` for OpenFGA API error context (carries `fgaCode`, `fgaMessage`, `httpStatus`)
+- `PHAPI::openfga()` accessor method for lazy-initialized OpenFGA client
+- `OpenFgaClient` DI singleton registration in `AppBootstrapper`
+- `openfga` config block in `config/phapi.php` (`api_url`, `store_id`, `model_id`, `api_token`)
+- OpenFGA service in Docker Compose development environment (MySQL-backed, with migrate init container)
+- Unit tests for all OpenFGA client methods (19 tests with MockHttpClient)
+- Integration tests for OpenFGA client (`@group integration @group openfga`)
+
 ## v1.3.0 — 2026-02-16
 
 ### Added

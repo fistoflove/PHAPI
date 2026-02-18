@@ -40,6 +40,12 @@ return [
         'pool_size' => 5,
         'pool_timeout' => 1.0,
     ],
+    'openfga' => [
+        'api_url' => 'http://localhost:8080',
+        'store_id' => '',
+        'model_id' => '',
+        'api_token' => '',
+    ],
     'orm' => [
         'mysql' => [
             'host' => '127.0.0.1',

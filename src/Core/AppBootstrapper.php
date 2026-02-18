@@ -12,6 +12,7 @@ use PHAPI\Server\MiddlewareManager;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
+use PHAPI\Services\OpenFgaClient;
 use PHAPI\Services\RedisClient;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\RealtimeManager;
@@ -61,6 +62,9 @@ final class AppBootstrapper
         });
         $container->singleton(MySqlPool::class, static function () use ($app) {
             return $app->mysql();
+        });
+        $container->singleton(OpenFgaClient::class, static function () use ($app) {
+            return $app->openfga();
         });
 
         $this->authConfigurator->registerMiddleware($middleware, $auth);

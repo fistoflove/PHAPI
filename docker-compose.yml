@@ -10,6 +10,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+      openfga:
+        condition: service_healthy
     environment:
       DB_HOST: mysql
       DB_PORT: 3306
@@ -18,6 +20,7 @@ services:
       DB_PASSWORD: phapi
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      OPENFGA_API_URL: http://openfga:8080
 
   mysql:
     image: mysql:8.0
@@ -26,6 +29,8 @@ services:
       MYSQL_DATABASE: phapi_test
       MYSQL_USER: phapi
       MYSQL_PASSWORD: phapi
+    volumes:
+      - ./docker/init-db:/docker-entrypoint-initdb.d
     ports:
       - "3306:3306"
     healthcheck:
@@ -45,3 +50,30 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+
+  openfga-migrate:
+    image: openfga/openfga:latest
+    command: migrate
+    environment:
+      OPENFGA_DATASTORE_ENGINE: mysql
+      OPENFGA_DATASTORE_URI: "root:root@tcp(mysql:3306)/openfga?parseTime=true"
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  openfga:
+    image: openfga/openfga:latest
+    command: run
+    environment:
+      OPENFGA_DATASTORE_ENGINE: mysql
+      OPENFGA_DATASTORE_URI: "root:root@tcp(mysql:3306)/openfga?parseTime=true"
+    ports:
+      - "8080:8080"
+    depends_on:
+      openfga-migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 10

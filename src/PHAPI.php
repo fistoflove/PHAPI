@@ -32,6 +32,8 @@ use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
 use PHAPI\Services\DefaultHttpClient;
 use PHAPI\Services\DefaultTaskRunner;
+use PHAPI\Services\OpenFgaClient;
+use PHAPI\Services\OpenFgaHttpClient;
 use PHAPI\Services\RedisClient;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\WebSocketConnection;
@@ -62,6 +64,7 @@ final class PHAPI
     private ProviderLoader $providerLoader;
     private ?RedisClient $redisClient = null;
     private ?MySqlPool $mysqlPool = null;
+    private ?OpenFgaClient $openFgaClient = null;
     /**
      * @var array<int, \PHAPI\Core\ServiceProviderInterface>
      */
@@ -1047,6 +1050,21 @@ final class PHAPI
         }
 
         return $this->redisClient;
+    }
+
+    /**
+     * Get the OpenFGA authorization client.
+     *
+     * @return OpenFgaClient
+     */
+    public function openfga(): OpenFgaClient
+    {
+        if ($this->openFgaClient === null) {
+            $config = $this->config['openfga'] ?? [];
+            $this->openFgaClient = new OpenFgaHttpClient($config, $this->http());
+        }
+
+        return $this->openFgaClient;
     }
 
     /**

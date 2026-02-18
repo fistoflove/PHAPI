@@ -54,6 +54,22 @@ php bin/phapi-run example.php
 
 **HttpClient custom headers**: All HttpClient methods (`getJson`, `getJsonWithMeta`, `postFormWithMeta`, `postJson`, `postJsonWithMeta`) accept an optional `array $headers = []` parameter for custom HTTP headers (e.g., `Authorization`, `Content-Type`).
 
+**OpenFGA client** (`src/Services/OpenFgaClient.php`): Interface + implementation (`OpenFgaHttpClient`) for Zanzibar-based fine-grained authorization via OpenFGA. Accessed via `$app->openfga()`. Uses PHAPI's `HttpClient` internally — no additional dependencies.
+
+Config (`config/phapi.php`):
+```php
+'openfga' => [
+    'api_url'   => 'http://localhost:8080',
+    'store_id'  => '',
+    'model_id'  => '',     // optional, uses latest if empty
+    'api_token' => '',     // pre-shared key, empty = no auth
+],
+```
+
+Methods: `check(user, relation, object): bool`, `batchCheck(checks): array`, `writeTuples(writes): void`, `deleteTuples(deletes): void`, `readTuples(?user, ?relation, ?object): array`, `listObjects(user, relation, type): array`, `listUsers(object, relation, userType): array`, `expand(relation, object): array`, `writeAuthorizationModel(typeDefinitions, schemaVersion): string`, `readAuthorizationModel(?id): array`.
+
+Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
+
 **Testing approach**: Use `PHAPI::kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
 
 ## Coding Standards
