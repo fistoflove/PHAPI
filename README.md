@@ -647,6 +647,30 @@ Config:
 ],
 ```
 
+## OpenTelemetry Tracing
+
+PHAPI includes opt-in distributed tracing via OpenTelemetry. Register the provider to instrument HTTP, MySQL, Redis, and OpenFGA automatically.
+
+```php
+$api = new PHAPI([
+    'providers' => [\PHAPI\Telemetry\TracingServiceProvider::class],
+    'telemetry' => [
+        'enabled' => (bool) getenv('OTEL_ENABLED'),
+        'service_name' => 'my-service',
+        'exporter_endpoint' => getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://localhost:4318',
+    ],
+]);
+```
+
+When enabled, the provider:
+- Installs `TracingMiddleware` as the first global middleware (root SERVER span with W3C context extraction)
+- Wraps `HttpClient` with `TracingHttpClient` (CLIENT spans + cross-service trace propagation)
+- Wraps `MySqlPool` with `TracingMySqlPool` (db.system=mysql, operation/table parsing)
+- Wraps `RedisClient` with `TracingRedisClient` (db.system=redis)
+- Wraps `OpenFgaClient` with `TracingOpenFgaClient` (fga.user, fga.relation, fga.object attributes)
+
+When `telemetry.enabled` is `false` (default), no spans are created and there is zero runtime overhead.
+
 ## ORM (MySQL via Hyperf)
 
 Requires a coroutine context, `ext-pdo_mysql`, and the Hyperf DB packages:

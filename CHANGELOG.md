@@ -2,6 +2,25 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.5.0 — 2026-02-18
+
+### Added
+- OpenTelemetry tracing module (`src/Telemetry/`) with opt-in `TracingServiceProvider`
+- `TracingMiddleware` — global middleware for root server spans with W3C trace context extraction
+- `TracingHttpClient` — decorator for outbound HTTP spans with cross-service W3C context propagation
+- `TracingMySqlPool` — decorator for MySQL query spans (`db.system=mysql`, operation + table parsing)
+- `TracingRedisClient` — decorator for Redis command spans (`db.system=redis`)
+- `TracingOpenFgaClient` — decorator for OpenFGA authorization spans with FGA semantic attributes
+- `TracingServiceProvider` — registers tracer, installs middleware and decorators, configures OTLP exporter with Swoole context storage
+- `HeadersGetter` — W3C `PropagationGetterInterface` implementation for request header extraction
+- New dependencies: `open-telemetry/api`, `open-telemetry/sdk`, `open-telemetry/context-swoole`, `open-telemetry/exporter-otlp`, `open-telemetry/sem-conv`
+- 37 new Telemetry tests (18 unit + 19 integration using real MySQL and Redis)
+- Test coverage report at `docs/test-coverage.md`
+
+### Fixed
+- `SwooleServerTest` hardcoded `/workspaces/PHAPI/vendor/autoload.php` path replaced with dynamic resolution
+- `TracingIntegrationTest` autoload path made portable
+
 ## v1.4.0 — 2026-02-18
 
 ### Added

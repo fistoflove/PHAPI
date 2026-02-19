@@ -583,9 +583,11 @@ final class SwooleServerTest extends TestCase
 
     private static function writeServerScript(): void
     {
+        $autoloadPath = dirname(__DIR__, 2) . '/vendor/autoload.php';
+
         $script = <<<'PHP'
 <?php
-require '/workspaces/PHAPI/vendor/autoload.php';
+require '__AUTOLOAD_PATH__';
 
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
@@ -888,6 +890,7 @@ $api->get('/redis/hash', function () use ($api) {
 $api->run();
 PHP;
 
+        $script = str_replace('__AUTOLOAD_PATH__', $autoloadPath, $script);
         file_put_contents(self::$serverScript, $script);
     }
 
