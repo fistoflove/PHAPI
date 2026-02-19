@@ -11,10 +11,10 @@ final class ProviderLoader
     /**
      * @param array<int, class-string<ServiceProviderInterface>> $providers
      * @param Container $container
-     * @param PHAPI $app
+     * @param array<string, mixed> $config
      * @return array<int, ServiceProviderInterface>
      */
-    public function register(array $providers, Container $container, PHAPI $app): array
+    public function register(array $providers, Container $container, array $config): array
     {
         $instances = [];
         foreach ($providers as $providerClass) {
@@ -22,7 +22,7 @@ final class ProviderLoader
             if (!$provider instanceof ServiceProviderInterface) {
                 throw new \RuntimeException("Provider {$providerClass} must implement ServiceProviderInterface");
             }
-            $provider->register($container, $app);
+            $provider->register($container, $config);
             $instances[] = $provider;
         }
 

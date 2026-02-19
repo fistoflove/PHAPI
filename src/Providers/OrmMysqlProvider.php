@@ -19,9 +19,8 @@ use PHAPI\Services\Database;
 
 final class OrmMysqlProvider implements ServiceProviderInterface
 {
-    public function register(Container $container, PHAPI $app): void
+    public function register(Container $container, array $config): void
     {
-        $config = $app->config();
         $ormConfig = $this->resolveOrmMysqlConfig($config);
         $this->validateOrmMysqlConfig($ormConfig);
 

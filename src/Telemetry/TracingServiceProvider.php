@@ -29,10 +29,10 @@ final class TracingServiceProvider implements ServiceProviderInterface
 {
     private ?TracerProvider $tracerProvider = null;
 
-    public function register(Container $container, PHAPI $app): void
+    public function register(Container $container, array $config): void
     {
         /** @var array{enabled?: bool, service_name?: string, service_version?: string, exporter_endpoint?: string} $telemetryConfig */
-        $telemetryConfig = $app->config()['telemetry'] ?? [];
+        $telemetryConfig = $config['telemetry'] ?? [];
 
         if (!$this->isEnabled($telemetryConfig)) {
             return;

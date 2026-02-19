@@ -11,7 +11,7 @@ use PHAPI\PHAPI;
 
 final class AppServiceProvider implements ServiceProviderInterface
 {
-    public function register(Container $container, PHAPI $app): void
+    public function register(Container $container, array $config): void
     {
         $container->singleton(ExternalService::class, ExternalService::class);
         $container->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);

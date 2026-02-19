@@ -12,10 +12,10 @@ interface ServiceProviderInterface
      * Register bindings or services.
      *
      * @param Container $container
-     * @param PHAPI $app
+     * @param array<string, mixed> $config
      * @return void
      */
-    public function register(Container $container, PHAPI $app): void;
+    public function register(Container $container, array $config): void;
 
     /**
      * Boot services after registration.

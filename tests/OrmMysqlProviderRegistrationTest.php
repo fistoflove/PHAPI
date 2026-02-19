@@ -36,7 +36,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         ]);
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
 
         $this->assertTrue($api->container()->has(ConfigInterface::class));
         $this->assertTrue($api->container()->has(PoolFactory::class));
@@ -60,7 +60,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         ]);
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
 
         // Verify Hyperf config was built correctly
         $config = $api->container()->get(ConfigInterface::class);
@@ -96,7 +96,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         ]);
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
 
         $config = $api->container()->get(ConfigInterface::class);
         $dbConfig = $config->get('db.connections.default');
@@ -119,7 +119,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('database name');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     public function testMissingUsernameThrows(): void
@@ -147,7 +147,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('username');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     public function testMissingHostThrows(): void
@@ -174,7 +174,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('host');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     public function testInvalidPoolMinMaxThrows(): void
@@ -201,7 +201,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('max_connections >= min_connections');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     public function testNonNumericPoolTimeoutThrows(): void
@@ -228,7 +228,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('connect_timeout');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     public function testNonArrayOptionsThrows(): void
@@ -256,7 +256,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         $this->expectExceptionMessage('options must be an array');
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
     }
 
     // ── Boot ────────────────────────────────────────────────
@@ -273,7 +273,7 @@ final class OrmMysqlProviderRegistrationTest extends TestCase
         ]);
 
         $provider = new OrmMysqlProvider();
-        $provider->register($api->container(), $api);
+        $provider->register($api->container(), $api->config());
 
         // boot() should not throw
         $provider->boot($api);

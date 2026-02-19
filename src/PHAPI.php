@@ -116,7 +116,7 @@ final class PHAPI
             $this->swooleDriver(),
             $this->webSocketHandler
         );
-        $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this);
+        $this->providers = $this->providerLoader->register($this->config['providers'] ?? [], $this->container, $this->config);
         $this->providerLoader->boot($this->providers, $this);
         $this->bootstrapper->registerSafetyMiddleware($this->middleware, $this->config);
         $this->defaultEndpoints->register($this, $this->jobs, $this->config);
