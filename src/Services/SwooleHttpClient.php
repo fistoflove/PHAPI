@@ -48,10 +48,10 @@ class SwooleHttpClient implements HttpClient
         $mergedHeaders = array_merge($defaultHeaders, $headers);
 
         if ($method === 'POST' && $body !== null) {
-            $client->setHeaders($mergedHeaders);
+            $client->setHeaders($mergedHeaders); // @phpstan-ignore method.notFound (exists at runtime, missing from Swoole stubs)
             $client->post($path, $body);
         } else {
-            $client->setHeaders($mergedHeaders);
+            $client->setHeaders($mergedHeaders); // @phpstan-ignore method.notFound (exists at runtime, missing from Swoole stubs)
             $client->get($path);
         }
 
