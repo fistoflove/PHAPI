@@ -12,6 +12,7 @@ use PHAPI\Core\Container;
 use PHAPI\Core\DefaultEndpoints;
 use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
+use PHAPI\Core\PHAPIBuilder;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
 use PHAPI\Core\ServiceAccessor;
@@ -73,8 +74,17 @@ final class PHAPI
     private array $groupMiddlewareStack = [[]];
 
     /**
+     * Create a new PHAPIBuilder for fluent, validated configuration.
+     */
+    public static function builder(): PHAPIBuilder
+    {
+        return new PHAPIBuilder();
+    }
+
+    /**
      * Create a new PHAPI instance with configuration overrides.
      *
+     * @internal Prefer PHAPI::builder() for new code.
      * @param array<string, mixed> $config
      * @return void
      */
