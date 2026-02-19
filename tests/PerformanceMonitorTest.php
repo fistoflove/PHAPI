@@ -190,8 +190,8 @@ final class PerformanceMonitorTest extends TestCase
 
         $content = file_get_contents($logFile);
         // Old health check removed, recent health check and other event kept
-        $this->assertStringNotContainsString('10', $content);
-        $this->assertStringContainsString('5', $content);
+        $this->assertStringNotContainsString("response_time_ms\t10", $content);
+        $this->assertStringContainsString("response_time_ms\t5", $content);
         $this->assertStringContainsString('Some other event', $content);
     }
 
