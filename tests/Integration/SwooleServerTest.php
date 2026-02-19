@@ -681,24 +681,20 @@ $api->onRequestEnd(function (Request $request, Response $response): void {
 
 $api->get('/ping', fn() => Response::json(['pong' => true]));
 
-$api->get('/users/{id}', function () {
-    $req = PHAPI::request();
-    return Response::json(['id' => $req?->param('id')]);
+$api->get('/users/{id}', function (Request $request) {
+    return Response::json(['id' => $request->param('id')]);
 })->name('users.show');
 
-$api->get('/search/{query?}', function () {
-    $req = PHAPI::request();
-    return Response::json(['query' => $req?->param('query')]);
+$api->get('/search/{query?}', function (Request $request) {
+    return Response::json(['query' => $request->param('query')]);
 });
 
-$api->post('/echo', function () {
-    $req = PHAPI::request();
-    return Response::json(['body' => $req?->body()]);
+$api->post('/echo', function (Request $request) {
+    return Response::json(['body' => $request->body()]);
 });
 
-$api->get('/query', function () {
-    $req = PHAPI::request();
-    return Response::json($req?->queryAll() ?? []);
+$api->get('/query', function (Request $request) {
+    return Response::json($request->queryAll());
 });
 
 $api->get('/custom-header', fn() => Response::json(['ok' => true])->withHeader('X-Custom', 'test-value'));
@@ -715,9 +711,8 @@ $api->get('/admin', fn() => Response::json(['ok' => true]))
 
 // ── Validation ───────────────────────────────────────────
 
-$api->post('/validated', function () {
-    $req = PHAPI::request();
-    return Response::json(['created' => true, 'data' => $req?->body()], 201);
+$api->post('/validated', function (Request $request) {
+    return Response::json(['created' => true, 'data' => $request->body()], 201);
 })->validate([
     'name' => 'required|string|min:2',
     'email' => 'required|email',
@@ -758,15 +753,12 @@ $api->group('/api/v1', function (PHAPI $api) {
 
 // ── Named route URL generation ───────────────────────────
 
-$api->get('/url-for/{id}', function () {
-    $req = PHAPI::request();
-    $app = PHAPI::app();
-    return Response::json(['url' => $app?->url('users.show', ['id' => $req?->param('id')])]);
+$api->get('/url-for/{id}', function (Request $request) use ($api) {
+    return Response::json(['url' => $api->url('users.show', ['id' => $request->param('id')])]);
 });
 
-$api->get('/url-for-query', function () {
-    $app = PHAPI::app();
-    return Response::json(['url' => $app?->url('users.show', ['id' => 1], ['page' => 2])]);
+$api->get('/url-for-query', function () use ($api) {
+    return Response::json(['url' => $api->url('users.show', ['id' => 1], ['page' => 2])]);
 });
 
 // ── DI / Container ──────────────────────────────────────
@@ -775,26 +767,22 @@ $api->get('/di-test', function (Request $req, GreetingService $svc) {
     return Response::json(['greeting' => $svc->greet()]);
 });
 
-$api->get('/resolve-test', function () {
-    $app = PHAPI::app();
-    return Response::json(['value' => $app?->resolve('custom-value')]);
+$api->get('/resolve-test', function () use ($api) {
+    return Response::json(['value' => $api->resolve('custom-value')]);
 });
 
 // ── All HTTP methods ─────────────────────────────────────
 
-$api->put('/resource/{id}', function () {
-    $req = PHAPI::request();
-    return Response::json(['method' => 'PUT', 'id' => $req?->param('id'), 'body' => $req?->body()]);
+$api->put('/resource/{id}', function (Request $request) {
+    return Response::json(['method' => 'PUT', 'id' => $request->param('id'), 'body' => $request->body()]);
 });
 
-$api->patch('/resource/{id}', function () {
-    $req = PHAPI::request();
-    return Response::json(['method' => 'PATCH', 'id' => $req?->param('id'), 'body' => $req?->body()]);
+$api->patch('/resource/{id}', function (Request $request) {
+    return Response::json(['method' => 'PATCH', 'id' => $request->param('id'), 'body' => $request->body()]);
 });
 
-$api->delete('/resource/{id}', function () {
-    $req = PHAPI::request();
-    return Response::json(['method' => 'DELETE', 'id' => $req?->param('id')]);
+$api->delete('/resource/{id}', function (Request $request) {
+    return Response::json(['method' => 'DELETE', 'id' => $request->param('id')]);
 });
 
 // ── Lifecycle hooks check ────────────────────────────────
@@ -817,9 +805,8 @@ $api->get('/mysql/ping', function () use ($api) {
     }
 });
 
-$api->post('/mysql/insert', function () use ($api) {
-    $req = PHAPI::request();
-    $body = $req?->body();
+$api->post('/mysql/insert', function (Request $request) use ($api) {
+    $body = $request->body();
     $api->mysql()->execute(
         'INSERT INTO swoole_test (name, value) VALUES (?, ?)',
         [$body['name'] ?? '', $body['value'] ?? '']
@@ -832,9 +819,8 @@ $api->get('/mysql/query', function () use ($api) {
     return Response::json(['rows' => $rows]);
 });
 
-$api->post('/mysql/transaction', function () use ($api) {
-    $req = PHAPI::request();
-    $items = $req?->body()['items'] ?? [];
+$api->post('/mysql/transaction', function (Request $request) use ($api) {
+    $items = $request->body()['items'] ?? [];
     $api->mysql()->withConnection(function (\PDO $pdo) use ($items) {
         $pdo->beginTransaction();
         foreach ($items as $item) {
@@ -858,31 +844,27 @@ $api->get('/redis/ping', function () use ($api) {
     }
 });
 
-$api->post('/redis/set', function () use ($api) {
-    $req = PHAPI::request();
-    $body = $req?->body();
+$api->post('/redis/set', function (Request $request) use ($api) {
+    $body = $request->body();
     $api->redis()->set($body['key'] ?? '', $body['value'] ?? '', $body['ttl'] ?? null);
     return Response::json(['set' => true]);
 });
 
-$api->get('/redis/get', function () use ($api) {
-    $req = PHAPI::request();
-    $key = $req?->query('key', '');
+$api->get('/redis/get', function (Request $request) use ($api) {
+    $key = $request->query('key', '');
     $value = $api->redis()->get($key);
     return Response::json(['value' => $value]);
 });
 
-$api->post('/redis/hash', function () use ($api) {
-    $req = PHAPI::request();
-    $body = $req?->body();
+$api->post('/redis/hash', function (Request $request) use ($api) {
+    $body = $request->body();
     $api->redis()->hMSet($body['key'], $body['data']);
     return Response::json(['ok' => true]);
 });
 
-$api->get('/redis/hash', function () use ($api) {
-    $req = PHAPI::request();
-    $key = $req?->query('key', '');
-    $field = $req?->query('field', '');
+$api->get('/redis/hash', function (Request $request) use ($api) {
+    $key = $request->query('key', '');
+    $field = $request->query('field', '');
     $value = $api->redis()->hGet($key, $field);
     return Response::json(['value' => $value === false ? null : $value]);
 });

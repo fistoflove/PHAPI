@@ -50,7 +50,6 @@ final class OrmMysqlProviderTest extends SwooleTestCase
         self::assertTrue($statementResult);
         self::assertSame(1, $connection->transactions);
         self::assertSame('ok', $transactionResult);
-        self::assertSame($db, PHAPI::db());
     }
 
     public function testProviderValidatesConfig(): void

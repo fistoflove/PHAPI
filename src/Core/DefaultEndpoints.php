@@ -21,14 +21,13 @@ final class DefaultEndpoints
     public function register(PHAPI $app, JobsManager $jobs, array $config): void
     {
         if ($this->isEnabled($config, 'monitor')) {
-            $app->get('/monitor', static function () use ($jobs): Response {
-                $appInstance = PHAPI::app();
+            $app->get('/monitor', static function () use ($app, $jobs): Response {
                 $logs = $jobs->logs();
 
                 return Response::json([
                     'ok' => true,
                     'time' => date('c'),
-                    'runtime' => $appInstance?->runtimeName(),
+                    'runtime' => $app->runtimeName(),
                     'jobs' => $logs,
                     'jobs_count' => count($logs),
                     'memory_bytes' => memory_get_usage(true),

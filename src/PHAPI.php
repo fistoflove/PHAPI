@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHAPI;
 
 use PHAPI\Auth\AuthManager;
-use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Core\AppBootstrapper;
 use PHAPI\Core\AuthConfigurator;
 use PHAPI\Core\ConfigLoader;
@@ -16,8 +15,6 @@ use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
 use PHAPI\Core\ServiceAccessor;
-use PHAPI\HTTP\Request;
-use PHAPI\HTTP\RequestContext;
 use PHAPI\Runtime\SwooleDriver;
 use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
@@ -37,7 +34,6 @@ final class PHAPI
     use Concerns\SchedulesJobs;
     use Concerns\HasServiceAccessors;
 
-    private static ?PHAPI $lastInstance = null;
     /**
      * @var array<string, mixed>
      */
@@ -85,7 +81,6 @@ final class PHAPI
      */
     public function __construct(array $config = [])
     {
-        self::$lastInstance = $this;
         $this->configLoader = new ConfigLoader();
         $this->config = $this->configLoader->load($config);
 
@@ -257,37 +252,6 @@ final class PHAPI
     }
 
     /**
-     * Get the last constructed PHAPI instance.
-     *
-     * @return self|null
-     */
-    public static function lastInstance(): ?self
-    {
-        return self::$lastInstance;
-    }
-
-    /**
-     * Alias for lastInstance().
-     *
-     * @return self|null
-     */
-    public static function app(): ?self
-    {
-        return self::$lastInstance;
-    }
-
-    /**
-     * Get the current request from the request context.
-     *
-     * @return Request|null
-     */
-    public static function request(): ?Request
-    {
-        return RequestContext::get();
-    }
-
-
-    /**
      * Access the auth manager.
      *
      * @return AuthManager
@@ -307,15 +271,6 @@ final class PHAPI
         return $this->serviceAccessor;
     }
 
-    /**
-     * Access the PHAPI database service, if registered.
-     *
-     * @return DatabaseInterface|null
-     */
-    public static function db(): ?DatabaseInterface
-    {
-        return static::app()?->database();
-    }
 
 
 

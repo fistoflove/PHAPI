@@ -6,7 +6,6 @@ namespace PHAPI\Tests;
 
 use PHAPI\Auth\AuthManager;
 use PHAPI\Core\Container;
-use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\HTTP\RouteBuilder;
@@ -57,36 +56,6 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
         ]);
 
         $this->assertTrue($api->config()['debug']);
-    }
-
-    // ─── Static Accessors ─────────────────────────────────────────────
-
-    public function testLastInstanceReturnsLatestConstruction(): void
-    {
-        $api = new PHAPI(['default_endpoints' => false]);
-
-        $this->assertSame($api, PHAPI::lastInstance());
-        $this->assertSame($api, PHAPI::app());
-    }
-
-    public function testStaticRequestReturnsNullOutsideRequestCycle(): void
-    {
-        $this->assertNull(PHAPI::request());
-    }
-
-    public function testStaticDbReturnsNullWhenNoProviderRegistered(): void
-    {
-        // DatabaseInterface not registered by default — should return null
-        // or throw depending on implementation; we just verify the method exists
-        new PHAPI(['default_endpoints' => false]);
-        try {
-            $result = PHAPI::db();
-            // If it doesn't throw, it may return null
-            $this->assertTrue($result === null || $result instanceof DatabaseInterface);
-        } catch (\Throwable) {
-            // Expected — DatabaseInterface not bound without OrmMysqlProvider
-            $this->assertTrue(true);
-        }
     }
 
     // ─── Route Registration ───────────────────────────────────────────
