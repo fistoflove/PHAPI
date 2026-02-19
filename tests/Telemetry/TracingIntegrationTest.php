@@ -358,7 +358,7 @@ class FileSpanExporter implements \\OpenTelemetry\\SDK\\Trace\\SpanExporterInter
 
 \$api->get('/mysql/ping', function () use (\$api, \$tracer) {
     try {
-        \$pool = new TracingMySqlPool(\$api->mysql(), \$tracer);
+        \$pool = new TracingMySqlPool(\$api->services()->mysql(), \$tracer);
         \$rows = \$pool->query('SELECT 1 AS ok');
         return Response::json(['ok' => (int)\$rows[0]['ok']]);
     } catch (\\Throwable \$e) {
@@ -368,7 +368,7 @@ class FileSpanExporter implements \\OpenTelemetry\\SDK\\Trace\\SpanExporterInter
 
 \$api->get('/redis/ping', function () use (\$api, \$tracer) {
     try {
-        \$client = new TracingRedisClient(\$api->redis(), \$tracer);
+        \$client = new TracingRedisClient(\$api->services()->redis(), \$tracer);
         \$client->set('otel:test', 'pong', 10);
         \$val = \$client->get('otel:test');
         return Response::json(['pong' => \$val]);

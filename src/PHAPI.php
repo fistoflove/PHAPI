@@ -32,7 +32,6 @@ final class PHAPI
     use Concerns\ManagesMiddleware;
     use Concerns\ManagesRuntime;
     use Concerns\SchedulesJobs;
-    use Concerns\HasServiceAccessors;
 
     /**
      * @var array<string, mixed>
@@ -176,36 +175,6 @@ final class PHAPI
     public function kernel(): HttpKernel
     {
         return $this->kernel;
-    }
-
-    /**
-     * Register a lightweight extension backed by the container.
-     *
-     * @param string $id
-     * @param callable(Container): mixed $factory
-     * @param bool $singleton
-     * @return self
-     */
-    public function extend(string $id, callable $factory, bool $singleton = true): self
-    {
-        if ($singleton) {
-            $this->container->singleton($id, $factory);
-        } else {
-            $this->container->bind($id, $factory, false);
-        }
-
-        return $this;
-    }
-
-    /**
-     * Resolve an entry from the container.
-     *
-     * @param string $id
-     * @return mixed
-     */
-    public function resolve(string $id)
-    {
-        return $this->container->get($id);
     }
 
     /**

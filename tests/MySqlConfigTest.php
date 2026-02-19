@@ -22,7 +22,7 @@ final class MySqlConfigTest extends \PHPUnit\Framework\TestCase
             ],
         ]);
 
-        $config = $this->readPoolConfig($api->mysql());
+        $config = $this->readPoolConfig($api->services()->mysql());
         self::assertSame('db.internal', $config['host']);
         self::assertSame(3307, $config['port']);
         self::assertSame('yard', $config['database']);

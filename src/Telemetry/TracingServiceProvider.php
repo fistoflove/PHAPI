@@ -93,17 +93,17 @@ final class TracingServiceProvider implements ServiceProviderInterface
 
         // Replace MySqlPool singleton with tracing decorator.
         $container->singleton(MySqlPool::class, static function () use ($app, $tracer): TracingMySqlPool {
-            return new TracingMySqlPool($app->mysql(), $tracer);
+            return new TracingMySqlPool($app->services()->mysql(), $tracer);
         });
 
         // Replace RedisClient singleton with tracing decorator.
         $container->singleton(RedisClient::class, static function () use ($app, $tracer): TracingRedisClient {
-            return new TracingRedisClient($app->redis(), $tracer);
+            return new TracingRedisClient($app->services()->redis(), $tracer);
         });
 
         // Replace OpenFgaClient singleton with tracing decorator.
         $container->singleton(OpenFgaClient::class, static function () use ($app, $tracer): TracingOpenFgaClient {
-            return new TracingOpenFgaClient($app->openfga(), $tracer);
+            return new TracingOpenFgaClient($app->services()->openfga(), $tracer);
         });
 
         // Flush spans on shutdown.

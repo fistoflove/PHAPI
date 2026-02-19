@@ -36,7 +36,7 @@ final class OrmMysqlProviderTest extends SwooleTestCase
             return $resolver;
         });
 
-        $db = $api->database();
+        $db = $api->services()->database();
         $tableResult = $db->table('users');
         $selectResult = $db->select('select * from users where id = ?', [1]);
         $statementResult = $db->statement('update users set name = ? where id = ?', ['Ada', 1]);

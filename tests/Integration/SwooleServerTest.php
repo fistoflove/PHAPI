@@ -656,7 +656,7 @@ $api->enableSecurityHeaders();
 
 // --- Container / DI ---
 $api->container()->singleton(GreetingService::class, fn() => new GreetingService());
-$api->extend('custom-value', fn() => 'extended-value');
+$api->container()->singleton('custom-value', fn() => 'extended-value');
 
 // --- Global middleware ---
 $api->middleware(function (Request $req, callable $next) {
@@ -768,7 +768,7 @@ $api->get('/di-test', function (Request $req, GreetingService $svc) {
 });
 
 $api->get('/resolve-test', function () use ($api) {
-    return Response::json(['value' => $api->resolve('custom-value')]);
+    return Response::json(['value' => $api->container()->get('custom-value')]);
 });
 
 // ── All HTTP methods ─────────────────────────────────────
@@ -798,7 +798,7 @@ $api->get('/hooks-check', function () {
 
 $api->get('/mysql/ping', function () use ($api) {
     try {
-        $rows = $api->mysql()->query('SELECT 1 AS ok');
+        $rows = $api->services()->mysql()->query('SELECT 1 AS ok');
         return Response::json(['ok' => (int)$rows[0]['ok']]);
     } catch (\Throwable $e) {
         return Response::error('MySQL error: ' . $e->getMessage(), 500);
@@ -807,7 +807,7 @@ $api->get('/mysql/ping', function () use ($api) {
 
 $api->post('/mysql/insert', function (Request $request) use ($api) {
     $body = $request->body();
-    $api->mysql()->execute(
+    $api->services()->mysql()->execute(
         'INSERT INTO swoole_test (name, value) VALUES (?, ?)',
         [$body['name'] ?? '', $body['value'] ?? '']
     );
@@ -815,13 +815,13 @@ $api->post('/mysql/insert', function (Request $request) use ($api) {
 });
 
 $api->get('/mysql/query', function () use ($api) {
-    $rows = $api->mysql()->query('SELECT name, value FROM swoole_test ORDER BY name');
+    $rows = $api->services()->mysql()->query('SELECT name, value FROM swoole_test ORDER BY name');
     return Response::json(['rows' => $rows]);
 });
 
 $api->post('/mysql/transaction', function (Request $request) use ($api) {
     $items = $request->body()['items'] ?? [];
-    $api->mysql()->withConnection(function (\PDO $pdo) use ($items) {
+    $api->services()->mysql()->withConnection(function (\PDO $pdo) use ($items) {
         $pdo->beginTransaction();
         foreach ($items as $item) {
             $stmt = $pdo->prepare('INSERT INTO swoole_test (name, value) VALUES (?, ?)');
@@ -836,8 +836,8 @@ $api->post('/mysql/transaction', function (Request $request) use ($api) {
 
 $api->get('/redis/ping', function () use ($api) {
     try {
-        $api->redis()->set('phapi:ping', 'pong', 10);
-        $val = $api->redis()->get('phapi:ping');
+        $api->services()->redis()->set('phapi:ping', 'pong', 10);
+        $val = $api->services()->redis()->get('phapi:ping');
         return Response::json(['pong' => $val]);
     } catch (\Throwable $e) {
         return Response::error('Redis error: ' . $e->getMessage(), 500);
@@ -846,26 +846,26 @@ $api->get('/redis/ping', function () use ($api) {
 
 $api->post('/redis/set', function (Request $request) use ($api) {
     $body = $request->body();
-    $api->redis()->set($body['key'] ?? '', $body['value'] ?? '', $body['ttl'] ?? null);
+    $api->services()->redis()->set($body['key'] ?? '', $body['value'] ?? '', $body['ttl'] ?? null);
     return Response::json(['set' => true]);
 });
 
 $api->get('/redis/get', function (Request $request) use ($api) {
     $key = $request->query('key', '');
-    $value = $api->redis()->get($key);
+    $value = $api->services()->redis()->get($key);
     return Response::json(['value' => $value]);
 });
 
 $api->post('/redis/hash', function (Request $request) use ($api) {
     $body = $request->body();
-    $api->redis()->hMSet($body['key'], $body['data']);
+    $api->services()->redis()->hMSet($body['key'], $body['data']);
     return Response::json(['ok' => true]);
 });
 
 $api->get('/redis/hash', function (Request $request) use ($api) {
     $key = $request->query('key', '');
     $field = $request->query('field', '');
-    $value = $api->redis()->hGet($key, $field);
+    $value = $api->services()->redis()->hGet($key, $field);
     return Response::json(['value' => $value === false ? null : $value]);
 });
 

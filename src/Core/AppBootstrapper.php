@@ -58,13 +58,13 @@ final class AppBootstrapper
         $container->set(AuthManager::class, $auth);
         $container->set('auth', $auth);
         $container->singleton(RedisClient::class, static function () use ($app) {
-            return $app->redis();
+            return $app->services()->redis();
         });
         $container->singleton(MySqlPool::class, static function () use ($app) {
-            return $app->mysql();
+            return $app->services()->mysql();
         });
         $container->singleton(OpenFgaClient::class, static function () use ($app) {
-            return $app->openfga();
+            return $app->services()->openfga();
         });
 
         $this->authConfigurator->registerMiddleware($middleware, $auth);

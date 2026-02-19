@@ -405,31 +405,32 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $api->extend('my.service', fn (Container $c) => new \stdClass());
+        $api->container()->singleton('my.service', fn (Container $c) => new \stdClass());
 
-        $resolved = $api->resolve('my.service');
+        $resolved = $api->container()->get('my.service');
         $this->assertInstanceOf(\stdClass::class, $resolved);
-        $this->assertSame($resolved, $api->resolve('my.service'), 'Singleton by default');
+        $this->assertSame($resolved, $api->container()->get('my.service'), 'Singleton by default');
     }
 
     public function testExtendTransientCreatesNewInstancesEachTime(): void
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $api->extend('transient.svc', fn (Container $c) => new \stdClass(), false);
+        $api->container()->bind('transient.svc', fn (Container $c) => new \stdClass(), false);
 
-        $first = $api->resolve('transient.svc');
-        $second = $api->resolve('transient.svc');
+        $first = $api->container()->get('transient.svc');
+        $second = $api->container()->get('transient.svc');
         $this->assertNotSame($first, $second);
     }
 
-    public function testExtendReturnsSelfForFluency(): void
+    public function testContainerSingletonReturnsSelf(): void
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->extend('noop', fn (Container $c) => null);
+        $container = $api->container();
+        $container->singleton('noop', fn (Container $c) => null);
 
-        $this->assertSame($api, $result);
+        $this->assertTrue($container->has('noop'));
     }
 
     public function testContainerGivesAccessToCoreServices(): void
@@ -448,7 +449,7 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $client = $api->http();
+        $client = $api->services()->http();
 
         $this->assertInstanceOf(HttpClient::class, $client);
     }
@@ -457,7 +458,7 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $runner = $api->tasks();
+        $runner = $api->services()->tasks();
 
         $this->assertInstanceOf(TaskRunner::class, $runner);
     }
@@ -466,7 +467,7 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $rt = $api->realtime();
+        $rt = $api->services()->realtime();
 
         $this->assertInstanceOf(Realtime::class, $rt);
     }
@@ -483,11 +484,11 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
             ],
         ]);
 
-        $pool = $api->mysql();
+        $pool = $api->services()->mysql();
 
         $this->assertInstanceOf(MySqlPool::class, $pool);
         // Lazy — same instance on second call
-        $this->assertSame($pool, $api->mysql());
+        $this->assertSame($pool, $api->services()->mysql());
     }
 
     public function testRedisReturnsRedisClient(): void
@@ -497,11 +498,11 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
             'redis' => ['host' => '127.0.0.1', 'port' => 6379],
         ]);
 
-        $redis = $api->redis();
+        $redis = $api->services()->redis();
 
         $this->assertInstanceOf(RedisClient::class, $redis);
         // Lazy — same instance on second call
-        $this->assertSame($redis, $api->redis());
+        $this->assertSame($redis, $api->services()->redis());
     }
 
     public function testOpenfgaReturnsOpenFgaClient(): void
@@ -514,11 +515,11 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
             ],
         ]);
 
-        $fga = $api->openfga();
+        $fga = $api->services()->openfga();
 
         $this->assertInstanceOf(OpenFgaClient::class, $fga);
         // Lazy — same instance on second call
-        $this->assertSame($fga, $api->openfga());
+        $this->assertSame($fga, $api->services()->openfga());
     }
 
     // ─── Runtime ──────────────────────────────────────────────────────

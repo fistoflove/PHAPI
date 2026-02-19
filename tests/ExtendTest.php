@@ -13,11 +13,11 @@ final class ExtendTest extends SwooleTestCase
     {
         $api = new PHAPI();
 
-        $api->extend('cache', function (Container $container): object {
+        $api->container()->singleton('cache', function (Container $container): object {
             return new \stdClass();
         });
 
-        $first = $api->resolve('cache');
+        $first = $api->container()->get('cache');
         $second = $api->container()->get('cache');
 
         self::assertSame($first, $second);
@@ -27,12 +27,12 @@ final class ExtendTest extends SwooleTestCase
     {
         $api = new PHAPI();
 
-        $api->extend('transient', function (Container $container): object {
+        $api->container()->bind('transient', function (Container $container): object {
             return new \stdClass();
         }, false);
 
-        $first = $api->resolve('transient');
-        $second = $api->resolve('transient');
+        $first = $api->container()->get('transient');
+        $second = $api->container()->get('transient');
 
         self::assertNotSame($first, $second);
     }
