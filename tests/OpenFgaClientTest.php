@@ -178,8 +178,36 @@ final class OpenFgaClientTest extends TestCase
         ], $result);
 
         $this->assertSame([
-            'tuple_key' => ['user' => 'user:anne', 'object' => 'doc:1'],
+            'tuple_key' => ['object' => 'doc:1', 'user' => 'user:anne'],
         ], $mock->lastPostData);
+    }
+
+    public function testReadTuplesWithNullObjectOmitsTupleKeyAndFiltersClientSide(): void
+    {
+        $mock = new MockHttpClient();
+        $mock->postJsonWithMetaReturn = [
+            'data' => [
+                'tuples' => [
+                    ['key' => ['user' => 'role:admin#member', 'relation' => 'granted', 'object' => 'global_permission:yard.manage']],
+                    ['key' => ['user' => 'role:viewer#member', 'relation' => 'granted', 'object' => 'global_permission:yard.read']],
+                    ['key' => ['user' => 'role:admin#member', 'relation' => 'granted', 'object' => 'app_permission:myapp:view']],
+                ],
+            ],
+            'status' => 200,
+            'body' => '',
+        ];
+
+        $client = new OpenFgaHttpClient(['api_url' => 'http://fga:8080', 'store_id' => 's1'], $mock);
+        $result = $client->readTuples('role:admin#member', 'granted', null);
+
+        // Should filter to only tuples matching user and relation
+        $this->assertSame([
+            ['user' => 'role:admin#member', 'relation' => 'granted', 'object' => 'global_permission:yard.manage'],
+            ['user' => 'role:admin#member', 'relation' => 'granted', 'object' => 'app_permission:myapp:view'],
+        ], $result);
+
+        // tuple_key must be omitted when object is null
+        $this->assertSame([], $mock->lastPostData);
     }
 
     public function testListObjectsReturnsObjectIds(): void

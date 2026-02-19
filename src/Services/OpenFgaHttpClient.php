@@ -131,28 +131,49 @@ final class OpenFgaHttpClient implements OpenFgaClient
 
     public function readTuples(?string $user, ?string $relation, ?string $object): array
     {
-        $tupleKey = [];
-        if ($user !== null) {
-            $tupleKey['user'] = $user;
-        }
-        if ($relation !== null) {
-            $tupleKey['relation'] = $relation;
-        }
-        if ($object !== null) {
-            $tupleKey['object'] = $object;
-        }
+        // OpenFGA requires tuple_key.object to include at least the type when
+        // tuple_key is present.  When the caller omits object we must drop
+        // tuple_key entirely (returns all tuples) and filter client-side.
+        $needsClientFilter = false;
+        $payload = [];
 
-        $payload = ['tuple_key' => $tupleKey];
+        if ($object !== null) {
+            // object is provided → we can build a valid tuple_key
+            $tupleKey = ['object' => $object];
+            if ($user !== null) {
+                $tupleKey['user'] = $user;
+            }
+            if ($relation !== null) {
+                $tupleKey['relation'] = $relation;
+            }
+            $payload['tuple_key'] = $tupleKey;
+        } else {
+            // No object → omit tuple_key and filter after fetch
+            $needsClientFilter = ($user !== null || $relation !== null);
+        }
 
         $response = $this->post('/read', $payload);
 
         $tuples = [];
         foreach ($response['tuples'] ?? [] as $entry) {
             $key = $entry['key'] ?? [];
+            $tupleUser = (string) ($key['user'] ?? '');
+            $tupleRelation = (string) ($key['relation'] ?? '');
+            $tupleObject = (string) ($key['object'] ?? '');
+
+            if ($needsClientFilter) {
+                if ($user !== null && $tupleUser !== $user) {
+                    continue;
+                }
+                if ($relation !== null && $tupleRelation !== $relation) {
+                    continue;
+                }
+            }
+
             $tuples[] = [
-                'user' => (string) ($key['user'] ?? ''),
-                'relation' => (string) ($key['relation'] ?? ''),
-                'object' => (string) ($key['object'] ?? ''),
+                'user' => $tupleUser,
+                'relation' => $tupleRelation,
+                'object' => $tupleObject,
             ];
         }
 
