@@ -15,6 +15,7 @@ use PHAPI\Core\HttpKernelFactory;
 use PHAPI\Core\JobsScheduler;
 use PHAPI\Core\ProviderLoader;
 use PHAPI\Core\RuntimeManager;
+use PHAPI\Core\ServiceAccessor;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 use PHAPI\Runtime\SwooleDriver;
@@ -24,13 +25,8 @@ use PHAPI\Server\MiddlewareManager;
 use PHAPI\Server\Router;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
-use PHAPI\Services\MySqlPool;
 use PHAPI\Services\DefaultHttpClient;
 use PHAPI\Services\DefaultTaskRunner;
-use PHAPI\Services\OpenFgaClient;
-use PHAPI\Services\OpenFgaHttpClient;
-use PHAPI\Services\RedisClient;
-use PHAPI\Services\Realtime;
 use PHAPI\Services\TaskRunner;
 
 final class PHAPI
@@ -39,6 +35,7 @@ final class PHAPI
     use Concerns\ManagesMiddleware;
     use Concerns\ManagesRuntime;
     use Concerns\SchedulesJobs;
+    use Concerns\HasServiceAccessors;
 
     private static ?PHAPI $lastInstance = null;
     /**
@@ -60,9 +57,7 @@ final class PHAPI
     private JobsScheduler $jobsScheduler;
     private DefaultEndpoints $defaultEndpoints;
     private ProviderLoader $providerLoader;
-    private ?RedisClient $redisClient = null;
-    private ?MySqlPool $mysqlPool = null;
-    private ?OpenFgaClient $openFgaClient = null;
+    private ServiceAccessor $serviceAccessor;
     /**
      * @var array<int, \PHAPI\Core\ServiceProviderInterface>
      */
@@ -101,6 +96,7 @@ final class PHAPI
         $this->errorHandler = $kernelComponents['errorHandler'];
         $this->kernel = $kernelComponents['kernel'];
         $this->container = $this->kernel->container();
+        $this->serviceAccessor = new ServiceAccessor($this->container, $this->config);
         $logDir = $this->config['jobs_log_dir'] ?? (getcwd() . '/var/jobs');
         $logLimit = (int)($this->config['jobs_log_limit'] ?? 200);
         $rotateBytes = (int)($this->config['jobs_log_rotate_bytes'] ?? 1048576);
@@ -292,17 +288,6 @@ final class PHAPI
 
 
     /**
-     * Get the task runner service.
-     *
-     * @return TaskRunner
-     */
-    public function tasks(): TaskRunner
-    {
-        return $this->container->get(TaskRunner::class);
-    }
-
-
-    /**
      * Access the auth manager.
      *
      * @return AuthManager
@@ -312,61 +297,14 @@ final class PHAPI
         return $this->auth;
     }
 
-
     /**
-     * Get the HTTP client service.
+     * Access the ServiceAccessor for typed service resolution.
      *
-     * @return HttpClient
+     * @return ServiceAccessor
      */
-    public function http(): HttpClient
+    public function services(): ServiceAccessor
     {
-        return $this->container->get(HttpClient::class);
-    }
-
-    /**
-     * Get the Redis client service.
-     *
-     * @return RedisClient
-     */
-    public function redis(): RedisClient
-    {
-        if ($this->redisClient === null) {
-            $config = $this->config['redis'] ?? [];
-            $this->redisClient = new RedisClient([
-                'host' => (string)($config['host'] ?? '127.0.0.1'),
-                'port' => (int)($config['port'] ?? 6379),
-                'auth' => isset($config['auth']) && $config['auth'] !== '' ? (string)$config['auth'] : null,
-                'db' => isset($config['db']) ? (int)$config['db'] : null,
-                'timeout' => isset($config['timeout']) ? (float)$config['timeout'] : 1.0,
-            ]);
-        }
-
-        return $this->redisClient;
-    }
-
-    /**
-     * Get the OpenFGA authorization client.
-     *
-     * @return OpenFgaClient
-     */
-    public function openfga(): OpenFgaClient
-    {
-        if ($this->openFgaClient === null) {
-            $config = $this->config['openfga'] ?? [];
-            $this->openFgaClient = new OpenFgaHttpClient($config, $this->http());
-        }
-
-        return $this->openFgaClient;
-    }
-
-    /**
-     * Get the ORM database service.
-     *
-     * @return DatabaseInterface
-     */
-    public function database(): DatabaseInterface
-    {
-        return $this->container->get(DatabaseInterface::class);
+        return $this->serviceAccessor;
     }
 
     /**
@@ -377,90 +315,6 @@ final class PHAPI
     public static function db(): ?DatabaseInterface
     {
         return static::app()?->database();
-    }
-
-    /**
-     * Get the MySQL connection pool.
-     *
-     * @return MySqlPool
-     */
-    public function mysql(): MySqlPool
-    {
-        if ($this->mysqlPool === null) {
-            $config = $this->config['mysql'] ?? [];
-            $dsnParts = self::parseMySqlDsn(isset($config['dsn']) ? (string) $config['dsn'] : '');
-            $this->mysqlPool = new MySqlPool([
-                'host' => (string)($dsnParts['host'] ?? $config['host'] ?? '127.0.0.1'),
-                'port' => (int)($dsnParts['port'] ?? $config['port'] ?? 3306),
-                'user' => (string)($config['user'] ?? 'root'),
-                'password' => (string)($config['password'] ?? ''),
-                'database' => (string)($dsnParts['database'] ?? $config['database'] ?? ''),
-                'charset' => (string)($dsnParts['charset'] ?? $config['charset'] ?? 'utf8mb4'),
-                'timeout' => isset($config['timeout']) ? (float)$config['timeout'] : 1.0,
-                'pool_size' => (int)($config['pool_size'] ?? 5),
-                'pool_timeout' => (float)($config['pool_timeout'] ?? 1.0),
-            ]);
-        }
-
-        return $this->mysqlPool;
-    }
-
-    /**
-     * @return array{host?: string, port?: int, database?: string, charset?: string}
-     */
-    private static function parseMySqlDsn(string $dsn): array
-    {
-        $dsn = trim($dsn);
-        if (!str_starts_with(strtolower($dsn), 'mysql:')) {
-            return [];
-        }
-
-        $parts = [];
-        foreach (explode(';', substr($dsn, 6)) as $segment) {
-            $segment = trim($segment);
-            if ($segment === '') {
-                continue;
-            }
-
-            $pair = explode('=', $segment, 2);
-            if (count($pair) !== 2) {
-                continue;
-            }
-
-            $key = strtolower(trim($pair[0]));
-            $value = trim($pair[1]);
-            if ($key === '') {
-                continue;
-            }
-
-            $parts[$key] = $value;
-        }
-
-        $parsed = [];
-        if (isset($parts['host']) && $parts['host'] !== '') {
-            $parsed['host'] = $parts['host'];
-        }
-        if (isset($parts['port']) && is_numeric($parts['port'])) {
-            $parsed['port'] = max(1, (int) $parts['port']);
-        }
-        if (isset($parts['dbname']) && $parts['dbname'] !== '') {
-            $parsed['database'] = $parts['dbname'];
-        }
-        if (isset($parts['charset']) && $parts['charset'] !== '') {
-            $parsed['charset'] = $parts['charset'];
-        }
-
-        return $parsed;
-    }
-
-    /**
-     * Get the realtime service.
-     *
-     * @return Realtime
-     */
-    public function realtime(): Realtime
-    {
-        return $this->container->get(Realtime::class);
     }
 
 
