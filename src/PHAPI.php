@@ -178,6 +178,16 @@ final class PHAPI
     }
 
     /**
+     * Access the error handler for custom exception handling.
+     *
+     * @return ErrorHandler
+     */
+    public function errorHandler(): ErrorHandler
+    {
+        return $this->errorHandler;
+    }
+
+    /**
      * Access the HTTP kernel for in-memory testing.
      *
      * @return HttpKernel
