@@ -82,7 +82,7 @@ class HttpKernel
                     throw new RouteNotFoundException($req->path(), $req->method());
                 }
 
-                $req = $req->withParams($route['matchedParams'] ?? []);
+                $req = $req->withParams(array_merge($req->params(), $route['matchedParams'] ?? []));
                 RequestContext::set($req);
 
                 if ($route['validation'] !== null) {

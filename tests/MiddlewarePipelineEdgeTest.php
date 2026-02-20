@@ -200,6 +200,55 @@ final class MiddlewarePipelineEdgeTest extends TestCase
         $this->assertSame(['applied'], $response->headerValues('X-After'));
     }
 
+    // --- 7e. Global middleware injected params survive to route handler ---
+
+    public function testGlobalMiddlewareParamsSurviveToRouteHandler(): void
+    {
+        $router = new Router();
+        $router->addRoute('GET', '/auth-check', static function (Request $req): Response {
+            $authUser = $req->param('__auth_user');
+            return Response::json(['auth_user' => $authUser]);
+        });
+
+        $mm = new MiddlewareManager();
+        $mm->addGlobalMiddleware(static function (Request $req, callable $next): Response {
+            $params = $req->params();
+            $params['__auth_user'] = '{"email":"test@example.com"}';
+            return $next($req->withParams($params));
+        });
+
+        $kernel = $this->buildKernel($router, $mm);
+        $response = $kernel->handle(new Request('GET', '/auth-check'));
+
+        $body = json_decode($response->body(), true);
+        $this->assertSame('{"email":"test@example.com"}', $body['auth_user']);
+    }
+
+    public function testGlobalMiddlewareParamsMergeWithRouteParams(): void
+    {
+        $router = new Router();
+        $router->addRoute('GET', '/users/{id}', static function (Request $req): Response {
+            return Response::json([
+                'id' => $req->param('id'),
+                'auth_user' => $req->param('__auth_user'),
+            ]);
+        });
+
+        $mm = new MiddlewareManager();
+        $mm->addGlobalMiddleware(static function (Request $req, callable $next): Response {
+            $params = $req->params();
+            $params['__auth_user'] = '{"email":"test@example.com"}';
+            return $next($req->withParams($params));
+        });
+
+        $kernel = $this->buildKernel($router, $mm);
+        $response = $kernel->handle(new Request('GET', '/users/42'));
+
+        $body = json_decode($response->body(), true);
+        $this->assertSame('42', $body['id']);
+        $this->assertSame('{"email":"test@example.com"}', $body['auth_user']);
+    }
+
     // --- resolveRouteMiddleware throws on unknown named middleware ---
 
     public function testResolveRouteMiddlewareThrowsOnUnknownName(): void
