@@ -159,7 +159,7 @@ class SwooleHttpClient implements HttpClient
             'Content-Type' => 'application/json',
         ];
         $mergedHeaders = array_merge($defaultHeaders, $headers);
-        $body = json_encode($data, JSON_THROW_ON_ERROR);
+        $body = json_encode($data === [] ? new \stdClass() : $data, JSON_THROW_ON_ERROR);
 
         return $this->runInCoroutine(
             $url,
