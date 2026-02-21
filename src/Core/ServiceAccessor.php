@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHAPI\Core;
 
+use PHAPI\Auth\GoogleIdTokenVerifier;
 use PHAPI\Contracts\DatabaseInterface;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\MySqlPool;
@@ -30,6 +31,8 @@ class ServiceAccessor
     private ?RedisClient $redisClient = null;
     private ?MySqlPool $mysqlPool = null;
     private ?OpenFgaClient $openFgaClient = null;
+    /** @var array<string, object> */
+    private array $singletons = [];
 
     /**
      * Create a new ServiceAccessor.
@@ -103,6 +106,22 @@ class ServiceAccessor
         }
 
         return $this->openFgaClient;
+    }
+
+    /**
+     * Get a Google ID token verifier for the given audience.
+     */
+    public function googleIdTokenVerifier(string $expectedAudience): GoogleIdTokenVerifier
+    {
+        $key = 'google_id_token_verifier_' . $expectedAudience;
+        if (!isset($this->singletons[$key])) {
+            $config = $this->config['google_oidc'] ?? [];
+            $certsUrl = (string) ($config['certs_url'] ?? 'https://www.googleapis.com/oauth2/v3/certs');
+            $this->singletons[$key] = new GoogleIdTokenVerifier($certsUrl, $this->http());
+        }
+
+        /** @var GoogleIdTokenVerifier */
+        return $this->singletons[$key];
     }
 
     /**

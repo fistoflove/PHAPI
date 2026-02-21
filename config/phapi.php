@@ -46,6 +46,9 @@ return [
         'model_id' => '',
         'api_token' => '',
     ],
+    'google_oidc' => [
+        'certs_url' => 'https://www.googleapis.com/oauth2/v3/certs',
+    ],
     'orm' => [
         'mysql' => [
             'host' => '127.0.0.1',

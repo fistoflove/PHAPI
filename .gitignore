@@ -4,7 +4,10 @@ composer.lock
 
 # Testing
 .phpunit.result.cache
+.phpunit.cache/
 phpunit.xml.bak
+coverage-html/
+coverage.xml
 
 # IDE
 .idea/
@@ -21,6 +24,9 @@ examples/*/logs/
 # OS
 .DS_Store
 Thumbs.db
+
+# Runtime
+/var/
 
 # Build artifacts
 *.phar
