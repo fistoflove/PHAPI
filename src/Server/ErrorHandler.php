@@ -10,9 +10,13 @@ use PHAPI\Exceptions\ValidationException;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 
+/**
+ * @api
+ */
 class ErrorHandler
 {
     private bool $debug;
+    private string $basePath;
     /**
      * @var callable(\Throwable, Request): (Response|mixed)|null
      */
@@ -22,11 +26,13 @@ class ErrorHandler
      * Create an error handler.
      *
      * @param bool $debug
+     * @param string $basePath Base path stripped from debug output to avoid leaking server paths.
      * @return void
      */
-    public function __construct(bool $debug = false)
+    public function __construct(bool $debug = false, string $basePath = '')
     {
         $this->debug = $debug;
+        $this->basePath = $basePath !== '' ? rtrim($basePath, '/') . '/' : '';
     }
 
     /**
@@ -83,18 +89,30 @@ class ErrorHandler
 
             if ($this->debug) {
                 $errorData['detail'] = $exception->getMessage();
-                $errorData['file'] = $exception->getFile();
+                $errorData['file'] = $this->stripBasePath($exception->getFile());
                 $errorData['line'] = $exception->getLine();
             }
         } else {
             if ($this->debug) {
                 $errorData['detail'] = $exception->getMessage();
-                $errorData['file'] = $exception->getFile();
+                $errorData['file'] = $this->stripBasePath($exception->getFile());
                 $errorData['line'] = $exception->getLine();
-                $errorData['trace'] = explode("\n", $exception->getTraceAsString());
+                $errorData['trace'] = array_map(
+                    fn (string $line): string => $this->stripBasePath($line),
+                    explode("\n", $exception->getTraceAsString())
+                );
             }
         }
 
         return Response::json($errorData, $statusCode);
+    }
+
+    private function stripBasePath(string $path): string
+    {
+        if ($this->basePath !== '' && str_starts_with($path, $this->basePath)) {
+            return substr($path, strlen($this->basePath));
+        }
+
+        return $path;
     }
 }

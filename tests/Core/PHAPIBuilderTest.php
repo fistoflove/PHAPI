@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHAPI\Tests\Core;
 
-use PHAPI\Core\PHAPIBuilder;
 use PHAPI\Exceptions\ConfigException;
 use PHAPI\PHAPI;
 use PHPUnit\Framework\TestCase;

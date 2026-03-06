@@ -74,6 +74,37 @@ Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
 
 **Google OIDC** (`src/Auth/GoogleIdTokenVerifier.php`): Verifies Google ID tokens (RS256 JWTs) with automatic JWKS certificate fetching and caching. Accessed via `$app->services()->googleIdTokenVerifier($audience)`. Throws `AuthException` (`src/Auth/AuthException.php`) on verification failures (invalid token, expired, bad audience, etc.).
 
+**Supabase Integration** (`src/Supabase/`): Native client for Supabase Auth (GoTrue), Database (PostgREST), and Storage APIs. Accessed via `SupabaseContext` which is request-scoped in the DI container.
+
+Config (`config/phapi.php`):
+```php
+'supabase' => [
+    'url'              => 'https://yourproject.supabase.co',
+    'anon_key'         => '',
+    'service_role_key' => '',  // optional, for admin operations
+    'schema'           => 'public',
+    'timeout'          => 5.0,
+    'retries'          => 0,
+],
+```
+
+Provider: `SupabaseProvider` — register in `providers` array. Binds `SupabaseConfig`, `SupabaseTransport`, `SupabaseFactory` as singletons, `SupabaseContext` as request-scoped. Registers `supabase.auth` and `supabase.role` named middleware in `boot()`.
+
+Key classes:
+- `SupabaseContext` — `auth()` (AuthClient), `db()` (DatabaseClient), `storage()` (StorageClient), `accessToken()`
+- `AuthClient` — `user()`, `signInWithPassword()`, `signUp()`, `signInWithOtp()`, `verifyOtp()`, `refreshToken()`, `signOut()`, `admin()` (AdminClient)
+- `AdminClient` — `listUsers()`, `getUser()`, `createUser()`, `updateUser()`, `deleteUser()`
+- `DatabaseClient` — `from($table)` returns `QueryBuilder`, `rpc($function, $params)`
+- `QueryBuilder` — immutable fluent builder: `select()`, `eq()`, `neq()`, `gt()`, `gte()`, `lt()`, `lte()`, `like()`, `ilike()`, `is()`, `in()`, `contains()`, `containedBy()`, `order()`, `limit()`, `range()`, `single()`, `maybeSingle()` → terminals: `get()`, `insert()`, `update()`, `upsert()`, `delete()`
+- `StorageClient` — `from($bucket)`, `listBuckets()`, `createBucket()`, `deleteBucket()`, `upload()`, `download()`, `delete()`, `copy()`, `move()`, `list()`, `publicUrl()`, `createSignedUrl()`, `createSignedUploadUrl()`
+- `SupabaseTransport` — Swoole coroutine HTTP client supporting GET/POST/PATCH/DELETE/PUT. Non-final for test subclassing.
+
+Middleware: `supabase.auth` extracts bearer token → validates via GoTrue → stores `SupabaseContext` in container. `supabase.role:admin` checks JWT role claim. Custom token resolver supported via constructor.
+
+Exceptions: `SupabaseException` (base, extends `PhapiException`), `SupabaseAuthException`, `SupabaseDatabaseException`, `SupabaseStorageException`. All carry `httpStatus()`, `details()`, `hint()`.
+
+Testing: `FakeTransport` (`tests/Supabase/FakeTransport.php`) extends `SupabaseTransport` — queues responses, records requests, no Swoole needed. 92 unit tests across 10 test files.
+
 **Testing approach**: Use `$api->kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
 
 ## Coding Standards
@@ -86,8 +117,8 @@ Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
 
 ## Exception Hierarchy
 
-All custom exceptions extend `PhapiException` (`src/Exceptions/`). HTTP-related: `NotFoundException`, `MethodNotAllowedException`, `ForbiddenException`, `UnauthorizedException`. Domain: `ValidationException`, `DatabaseException`, `ContainerException`, `ConfigException`, `HttpRequestException`, `OpenFgaException`. Auth: `AuthException` (`src/Auth/AuthException.php`) extends `RuntimeException` directly (not `PhapiException`) — thrown by `GoogleIdTokenVerifier`.
+All custom exceptions extend `PhapiException` (`src/Exceptions/`). HTTP-related: `NotFoundException`, `MethodNotAllowedException`, `ForbiddenException`, `UnauthorizedException`. Domain: `ValidationException`, `DatabaseException`, `ContainerException`, `ConfigException`, `HttpRequestException`, `OpenFgaException`. Supabase: `SupabaseException` (base), `SupabaseAuthException`, `SupabaseDatabaseException`, `SupabaseStorageException` — all extend `PhapiException` via `SupabaseException`. Auth: `AuthException` (`src/Auth/AuthException.php`) extends `RuntimeException` directly (not `PhapiException`) — thrown by `GoogleIdTokenVerifier`.
 
 ## Configuration
 
-Default config in `config/phapi.php`. Key settings: `host`, `port`, `debug`, `enable_websockets`, `swoole_settings` (passed to `Swoole\Server::set()`), `providers`, `redis`, `mysql`, `orm`, `http_timeout` (float, default 5.0 — HTTP client request timeout), `google_oidc` (certs URL + `cache_ttl` for JWKS certificate cache in seconds, default 300), `telemetry` (OpenTelemetry tracing config). Optional dependencies: `hyperf/*` (ORM) and `open-telemetry/*` (tracing) are in `suggest` — install explicitly when needed.
+Default config in `config/phapi.php`. Key settings: `host`, `port`, `debug`, `enable_websockets`, `swoole_settings` (passed to `Swoole\Server::set()`), `providers`, `redis`, `mysql`, `orm`, `http_timeout` (float, default 5.0 — HTTP client request timeout), `supabase` (url, anon_key, service_role_key, schema, timeout, retries), `google_oidc` (certs URL + `cache_ttl` for JWKS certificate cache in seconds, default 300), `telemetry` (OpenTelemetry tracing config). Optional dependencies: `hyperf/*` (ORM) and `open-telemetry/*` (tracing) are in `suggest` — install explicitly when needed.

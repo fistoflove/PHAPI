@@ -6,6 +6,9 @@ namespace PHAPI\Services;
 
 use PHAPI\Contracts\WebSocketDriverInterface;
 
+/**
+ * @api
+ */
 final class WebSocketConnection
 {
     public function __construct(
@@ -55,4 +58,3 @@ final class WebSocketConnection
         return $this->driver->send($this->fd, $payload);
     }
 }
-

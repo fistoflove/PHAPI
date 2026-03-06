@@ -127,4 +127,3 @@ final class TestWebSocketDriver implements WebSocketDriverInterface
         return [];
     }
 }
-

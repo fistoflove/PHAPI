@@ -16,6 +16,7 @@ use PHAPI\Services\RedisClient;
  * composition to avoid tight coupling to the inheritance chain and to
  * ensure span lifecycle is clean (no accidental calls to parent methods
  * that skip instrumentation).
+ * @api
  */
 final class TracingRedisClient
 {

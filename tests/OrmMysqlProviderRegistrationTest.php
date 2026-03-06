@@ -9,11 +9,9 @@ use Hyperf\Database\Connectors\ConnectionFactory;
 use Hyperf\DbConnection\ConnectionResolver;
 use Hyperf\DbConnection\Pool\PoolFactory;
 use PHAPI\Contracts\DatabaseInterface;
-use PHAPI\Core\Container;
 use PHAPI\Exceptions\ConfigException;
 use PHAPI\PHAPI;
 use PHAPI\Providers\OrmMysqlProvider;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**

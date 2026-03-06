@@ -81,4 +81,3 @@ final class SwooleDriverTimerApiTest extends TestCase
         $this->assertFalse($driver->disconnect(123));
     }
 }
-

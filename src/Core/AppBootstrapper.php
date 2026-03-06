@@ -13,11 +13,14 @@ use PHAPI\Services\HttpClient;
 use PHAPI\Services\JobsManager;
 use PHAPI\Services\MySqlPool;
 use PHAPI\Services\OpenFgaClient;
-use PHAPI\Services\RedisClient;
 use PHAPI\Services\Realtime;
 use PHAPI\Services\RealtimeManager;
+use PHAPI\Services\RedisClient;
 use PHAPI\Services\TaskRunner;
 
+/**
+ * @api
+ */
 final class AppBootstrapper
 {
     private AuthConfigurator $authConfigurator;

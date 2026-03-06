@@ -6,6 +6,9 @@ namespace PHAPI\Database;
 
 use Hyperf\DbConnection\Model\Model;
 
+/**
+ * @api
+ */
 abstract class PhapiModel extends Model
 {
     /**

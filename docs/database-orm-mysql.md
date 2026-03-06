@@ -1,7 +1,7 @@
 # MySQL ORM (Hyperc DB stack)
 
 PHAPI ships an optional MySQL ORM integration based on Hyperf's database stack. It provides
-query builder access via `$api->database()` or `PHAPI::db()` and an Eloquent-style base
+query builder access via `$api->services()->database()` and an Eloquent-style base
 model via `PHAPI\Database\PhapiModel`.
 
 ## Install
@@ -72,7 +72,7 @@ If `orm.mysql` is not set, PHAPI derives it from the existing `mysql` config blo
 ### Query builder
 
 ```php
-$users = $api->database()->table('users')
+$users = $api->services()->database()->table('users')
     ->where('active', 1)
     ->orderByDesc('id')
     ->get();
@@ -94,9 +94,9 @@ $active = User::query()->where('active', 1)->get();
 ### Transactions
 
 ```php
-$api->database()->transaction(function () use ($api) {
-    $api->database()->statement('UPDATE wallets SET balance = balance - 1 WHERE id = ?', [1]);
-    $api->database()->statement('UPDATE wallets SET balance = balance + 1 WHERE id = ?', [2]);
+$api->services()->database()->transaction(function () use ($api) {
+    $api->services()->database()->statement('UPDATE wallets SET balance = balance - 1 WHERE id = ?', [1]);
+    $api->services()->database()->statement('UPDATE wallets SET balance = balance + 1 WHERE id = ?', [2]);
 });
 ```
 
@@ -105,9 +105,9 @@ $api->database()->transaction(function () use ($api) {
 Use the task runner or jobs to execute database work in parallel coroutines:
 
 ```php
-$results = $api->tasks()->parallel([
-    fn () => $api->database()->table('users')->count(),
-    fn () => $api->database()->table('orders')->count(),
+$results = $api->services()->tasks()->parallel([
+    fn () => $api->services()->database()->table('users')->count(),
+    fn () => $api->services()->database()->table('orders')->count(),
 ]);
 ```
 

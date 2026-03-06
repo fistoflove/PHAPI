@@ -7,6 +7,7 @@ namespace PHAPI\Logging;
 /**
  * Channel-specific logger wrapper
  * Provides cleaner API for logging to specific channels
+ * @api
  */
 class ChannelLogger
 {

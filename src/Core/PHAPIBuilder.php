@@ -7,6 +7,9 @@ namespace PHAPI\Core;
 use PHAPI\Exceptions\ConfigException;
 use PHAPI\PHAPI;
 
+/**
+ * @api
+ */
 final class PHAPIBuilder
 {
     /**

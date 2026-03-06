@@ -148,4 +148,32 @@ final class ErrorHandlerTest extends TestCase
         $debug = json_decode($handler->handle($exception, $request)->body(), true);
         $this->assertSame('detail', $debug['detail']);
     }
+
+    // --- Base path stripping ---
+
+    public function testBasePathStripsAbsolutePathsInDebugMode(): void
+    {
+        $handler = new ErrorHandler(true, '/var/www/myapp');
+        $exception = new \RuntimeException('oops');
+        $response = $handler->handle($exception, new Request('GET', '/'));
+
+        $body = json_decode($response->body(), true);
+        $this->assertArrayHasKey('file', $body);
+        $this->assertStringNotContainsString('/var/www/myapp/', $body['file']);
+
+        foreach ($body['trace'] as $line) {
+            $this->assertStringNotContainsString('/var/www/myapp/', $line);
+        }
+    }
+
+    public function testNoBasePathLeavesFullPathsInDebugMode(): void
+    {
+        $handler = new ErrorHandler(true);
+        $exception = new \RuntimeException('oops');
+        $response = $handler->handle($exception, new Request('GET', '/'));
+
+        $body = json_decode($response->body(), true);
+        // File should be an absolute path (this test file)
+        $this->assertStringStartsWith('/', $body['file']);
+    }
 }

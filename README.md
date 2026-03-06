@@ -711,6 +711,139 @@ final class User extends PhapiModel
 If `orm.mysql` is missing, PHAPI derives it from the existing `mysql` block for compatibility.
 See `docs/database-orm-mysql.md` for full configuration and usage notes.
 
+## Supabase Integration
+
+Native Swoole-optimized client for Supabase Auth, Database (PostgREST), Storage, Edge Functions, and Realtime (Postgres Changes, Broadcast, Presence). API mirrors [supabase-js](https://supabase.com/docs/reference/javascript) for easy migration.
+
+```php
+use PHAPI\Supabase\SupabaseProvider;
+
+$api = PHAPI::builder()
+    ->providers([SupabaseProvider::class])
+    ->config('supabase', [
+        'url'              => getenv('SUPABASE_URL'),
+        'anon_key'         => getenv('SUPABASE_ANON_KEY'),
+        'service_role_key' => getenv('SUPABASE_SERVICE_ROLE_KEY'),
+        'buckets'          => [  // auto-provisioned on startup
+            'avatars' => ['public' => true],
+        ],
+    ])
+    ->build();
+```
+
+The provider registers `supabase.auth` and `supabase.role` named middleware, binds a request-scoped `SupabaseContext`, and provisions declared buckets in parallel on worker start.
+
+### Auth
+
+```php
+// Protect routes
+$api->get('/profile', function () use ($api): Response {
+    $context = $api->container()->get(\PHAPI\Supabase\SupabaseContext::class);
+    return Response::json($context->auth()->user());
+})->middleware('supabase.auth');
+
+// Sign in (password, OTP, OAuth, ID token)
+$session = $context->auth()->signInWithPassword($email, $password);
+$context->auth()->signInWithOtp($email);
+$result = $context->auth()->signInWithOAuth('google', ['redirectTo' => $url]);
+$session = $context->auth()->signInWithIdToken(['provider' => 'google', 'token' => $idToken]);
+
+// User management
+$context->auth()->updateUser(['data' => ['name' => 'New Name']]);
+$context->auth()->resetPasswordForEmail($email);
+
+// Admin (service role)
+$admin = $factory->createServiceContext()->auth()->admin();
+$admin->listUsers();
+$admin->createUser(['email' => $email, 'password' => $pw, 'email_confirm' => true]);
+$admin->inviteUserByEmail($email);
+$admin->generateLink('signup', $email);
+```
+
+### Database (PostgREST)
+
+```php
+$db = $context->db();
+
+// Query with filters, ordering, pagination
+$posts = $db->from('posts')
+    ->select('id,title,created_at')
+    ->eq('published', true)
+    ->not('status', 'eq', 'archived')
+    ->or('category.eq.news,category.eq.blog')
+    ->textSearch('body', 'php swoole')
+    ->order('created_at', 'desc')
+    ->limit(10)
+    ->get();
+
+// CRUD
+$db->from('posts')->insert(['title' => 'Hello']);
+$db->from('posts')->eq('id', 1)->update(['title' => 'Updated']);
+$db->from('posts')->upsert(['id' => 1, 'title' => 'Upserted']);
+$db->from('posts')->eq('id', 1)->delete();
+
+// RPC
+$result = $db->rpc('my_function', ['arg' => 'value']);
+```
+
+### Storage
+
+```php
+$storage = $context->storage();
+
+$storage->from('avatars')->upload('user.png', $fileContents, 'image/png');
+$content = $storage->from('avatars')->download('user.png');
+$url = $storage->from('avatars')->getPublicUrl('user.png');
+$signed = $storage->from('avatars')->createSignedUrl('user.png', 3600);
+$batch = $storage->from('avatars')->createSignedUrls(['a.png', 'b.png'], 3600);
+$storage->from('docs')->remove(['old-file.txt']);
+
+// Bucket management
+$storage->ensureBucket('uploads', ['public' => true]);
+$storage->emptyBucket('temp');
+```
+
+### Edge Functions
+
+```php
+$result = $context->functions()->invoke('hello', ['name' => 'World']);
+// $result['data'] => response data, $result['error'] => null or error
+```
+
+### Realtime
+
+Persistent WebSocket connection for Postgres Changes (CDC), Broadcast, and Presence:
+
+```php
+$factory = $app->container()->get(\PHAPI\Supabase\SupabaseFactory::class);
+$realtime = $factory->realtime();
+
+// Listen to database changes
+$channel = $realtime->channel('db-changes');
+$channel->on('postgres_changes', [
+    'event' => 'INSERT',
+    'schema' => 'public',
+    'table' => 'posts',
+], function (array $data) {
+    echo 'New post: ' . $data['record']['title'];
+});
+$channel->subscribe();
+
+// Broadcast messages
+$room = $realtime->channel('chat', ['broadcast' => ['self' => true]]);
+$room->on('broadcast', ['event' => 'message'], fn($p) => handleMsg($p));
+$room->subscribe();
+$room->send(['type' => 'broadcast', 'event' => 'message', 'payload' => ['text' => 'Hi']]);
+
+// Presence tracking
+$lobby = $realtime->channel('lobby');
+$lobby->on('presence', ['event' => 'sync'], fn() => print_r($lobby->presenceState()));
+$lobby->subscribe();
+$lobby->track(['user' => 'alice', 'online_at' => date('c')]);
+```
+
+See `docs/supabase.md` for the complete API reference and supabase-js migration guide.
+
 ## Error Responses
 
 `Response::error()` returns a JSON payload with `error` plus any extra fields you pass.

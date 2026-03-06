@@ -13,6 +13,8 @@ use PHAPI\Services\MySqlPool;
  * These tests exercise the pool's Channel-based connection management
  * without requiring a real MySQL server. We use reflection to inject
  * mock PDO connections into the pool's Channel directly.
+ *
+ * @requires extension pdo_sqlite
  */
 final class MySqlPoolCoroutineTest extends SwooleTestCase
 {

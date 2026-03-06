@@ -7,6 +7,9 @@ namespace PHAPI\Server;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 
+/**
+ * @api
+ */
 class MiddlewareManager
 {
     /**

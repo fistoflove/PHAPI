@@ -26,8 +26,8 @@ $api->setWebSocketHandler(function ($server, $frame, $driver): void {
     }
 });
 
-$api->get('/broadcast', function (): Response {
-    PHAPI::app()?->realtime()->broadcast('updates', ['ok' => true]);
+$api->get('/broadcast', function () use ($api): Response {
+    $api->services()->realtime()->broadcast('updates', ['ok' => true]);
     return Response::json(['sent' => true]);
 });
 

@@ -7,25 +7,22 @@
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 624 |
-| **Assertions** | 1,313 |
+| **Total Tests** | 984 (+integration) |
 | **Errors / Failures** | 0 |
-| **Skipped** | 9 |
-| **Line Coverage** | **67.07%** (2,293 / 3,419) |
-| **Method Coverage** | **48.52%** (263 / 542) |
-| **Class Coverage** | **19.35%** (12 / 62) |
-| **Source Files** | 93 (.php in src/) |
-| **Test Files** | 76 (.php in tests/) |
+| **Source Files** | 112 (.php in src/) |
+| **Test Files** | 96 (.php in tests/) |
 
 ### Test Breakdown
 
 | Category | Files | Tests | Type |
 |----------|-------|-------|------|
-| Unit tests | 59 | ~477 | Mocks, in-memory kernel |
-| Integration tests | 6 | ~19 | Real MySQL, Redis, OpenFGA, Swoole server |
-| Telemetry tests | 6 | 37 | Unit (mocks) + integration (real MySQL/Redis) |
-| Telemetry unit | 3 | 18 | TracingMiddleware, TracingHttpClient, TracingOpenFgaClient |
-| Telemetry integration | 3 | 19 | TracingMySqlPool (real MySQL), TracingRedisClient (real Redis), TracingIntegration |
+| Unit tests | ~60 | ~537 | Mocks, in-memory kernel |
+| Supabase unit tests | 12 | 201 | Mocks — Auth, Database, Storage, Middleware, QueryBuilder, Realtime |
+| Integration tests | 8 | ~113 | Real MySQL, Redis, OpenFGA, Swoole HTTP + WebSocket server |
+| Supabase integration | 8 | ~101 | Real Supabase Docker stack (GoTrue, PostgREST, Storage, Inbucket, Realtime) |
+| Telemetry tests | 6 | 38 | Unit (mocks) + integration (real MySQL/Redis) |
+| WebSocket server tests | 3 | 14 | 7 unit (mocks), 7 integration (real Swoole WS server) |
+| Supabase Realtime tests | 6 | 77 | 71 unit (FakeRealtimeSocket), 6 integration (real Supabase WS) |
 
 ---
 
@@ -46,7 +43,6 @@
 | `HTTP\Validator` | 8/8 | 119/119 |
 | `Logging\ChannelLogger` | 5/5 | 14/14 |
 | `Server\ErrorHandler` | 4/4 | 26/26 |
-| `Server\JobManager` | 7/7 | 54/54 |
 
 ### Well Covered (>= 90% lines)
 
@@ -60,9 +56,7 @@
 | `HTTP\RequestContext` | 3/4 (75%) | 17/18 (94%) | |
 | `HTTP\Response` | 20/21 (95%) | 53/56 (95%) | |
 | `Logging\Logger` | 24/26 (92%) | 138/143 (97%) | |
-| `Server\CORSHandler` | 5/6 (83%) | 44/45 (98%) | |
 | `Server\MiddlewareManager` | 7/8 (88%) | 26/27 (96%) | |
-| `Server\PerformanceMonitor` | 3/5 (60%) | 63/68 (93%) | |
 | `Routing\Route` | 2/5 (40%) | 44/49 (90%) | |
 | `Services\SwooleRealtime` | 1/2 (50%) | 14/15 (93%) | |
 | `Services\WebSocketConnection` | 6/7 (86%) | 11/12 (92%) | |
@@ -78,7 +72,6 @@
 | `HTTP\RouteBuilder` | 3/12 (25%) | 28/53 (53%) | Fluent API — many methods untested |
 | `Server\HttpKernel` | 6/12 (50%) | 145/167 (87%) | |
 | `Server\Router` | 5/16 (31%) | 123/148 (83%) | |
-| `Server\TaskManager` | 4/5 (80%) | 37/42 (88%) | |
 | `Providers\OrmMysqlProvider` | 3/7 (43%) | 126/155 (81%) | |
 | `Services\OpenFgaHttpClient` | 5/14 (36%) | 136/156 (87%) | Low method% — 14 methods, only 5 directly tested |
 | `Services\WebSocketMessage` | 3/4 (75%) | 6/7 (86%) | |
@@ -97,7 +90,7 @@
 | `Core\JobsScheduler` | 0/1 (0%) | 2/16 (13%) | Requires Swoole timer runtime. |
 | `Core\RuntimeManager` | 3/5 (60%) | 5/9 (56%) | |
 | `Runtime\Capabilities` | 1/5 (20%) | 4/8 (50%) | Enum-like, little logic. |
-| `Runtime\SwooleDriver` | 12/46 (26%) | 110/296 (37%) | Swoole server lifecycle — requires running server process. Integration test covers basic path. |
+| `Runtime\SwooleDriver` | 12/46 (26%) | 110/296 (37%) | Swoole server lifecycle — requires running server process. Integration tests cover HTTP and WebSocket paths. |
 | `Services\Database` | 1/7 (14%) | 6/20 (30%) | ORM wrapper — tested via OrmMysqlProvider integration. |
 | `Services\JobsManager` | 15/24 (63%) | 170/193 (88%) | 21 tests covering registration, execution, locking, logging, rotation, state. |
 | `Services\MySqlPool` | 6/15 (40%) | 70/103 (68%) | Pool management methods partially covered by integration. |

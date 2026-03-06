@@ -155,6 +155,9 @@ class Client
 {
     public string $body = '';
     public int $statusCode = 0;
+    public bool $connected = false;
+    public string $errMsg = '';
+    public int $errCode = 0;
     public function __construct(string $host, int $port, bool $ssl = false)
     {
     }
@@ -162,11 +165,40 @@ class Client
     public function set(array $settings): void
     {
     }
+    /** @param array<string, string> $headers */
+    public function setHeaders(array $headers): void
+    {
+    }
+    public function setMethod(string $method): void
+    {
+    }
+    public function setData(string $data): void
+    {
+    }
+    public function execute(string $path): bool
+    {
+        return true;
+    }
     public function post(string $path, string $data): bool
     {
         return true;
     }
     public function get(string $path): bool
+    {
+        return true;
+    }
+    public function upgrade(string $path): bool
+    {
+        return true;
+    }
+    /**
+     * @return \Swoole\WebSocket\Frame|false
+     */
+    public function recv(float $timeout = 0): \Swoole\WebSocket\Frame|false
+    {
+        return false;
+    }
+    public function push(string $data, int $opcode = 1, bool $finish = true): bool
     {
         return true;
     }
@@ -182,6 +214,14 @@ function run(callable $fn): void
 }
 
 namespace Swoole\WebSocket;
+
+class Frame
+{
+    public string $data = '';
+    public int $opcode = 1;
+    public int $fd = 0;
+    public bool $finish = true;
+}
 
 class Server extends \Swoole\Server
 {

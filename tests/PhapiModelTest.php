@@ -26,7 +26,7 @@ final class PhapiModelTest extends TestCase
     protected function setUp(): void
     {
         // Set up a minimal container so Hyperf Model can boot
-        $dispatcher = new class implements EventDispatcherInterface {
+        $dispatcher = new class () implements EventDispatcherInterface {
             public function dispatch(object $event): object
             {
                 return $event;

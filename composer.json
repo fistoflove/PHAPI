@@ -1,6 +1,6 @@
 {
     "name": "phapi/phapi",
-    "version": "1.5.1",
+    "version": "1.6.0",
     "description": "A lightweight, high-performance wrapper for Swoole HTTP server with routing, middleware, validation, CORS, and async task support",
     "keywords": [
         "swoole",
@@ -78,6 +78,7 @@
     "scripts": {
         "test": "phpunit --testdox",
         "test:integration": "phpunit --testdox --group integration",
+        "test:supabase": "phpunit --testdox --group supabase",
         "lint": "php-cs-fixer fix --dry-run --diff",
         "lint:fix": "php-cs-fixer fix",
         "phpunit": "phpunit",

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHAPI\Auth;
 
+/**
+ * @api
+ */
 class SessionGuard implements GuardInterface
 {
     private string $key;

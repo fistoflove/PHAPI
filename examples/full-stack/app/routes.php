@@ -3,7 +3,6 @@
 use PHAPI\Examples\FullStack\Controllers\StatusController;
 use PHAPI\Examples\FullStack\Services\ExternalService;
 use PHAPI\HTTP\Response;
-use PHAPI\PHAPI;
 
 $api->get('/', function (): Response {
     return Response::json(['message' => 'Example app']);
@@ -11,8 +10,8 @@ $api->get('/', function (): Response {
 
 $api->get('/status', [StatusController::class, 'show']);
 
-$api->get('/tasks', function (): Response {
-    $results = PHAPI::app()?->tasks()->parallel([
+$api->get('/tasks', function () use ($api): Response {
+    $results = $api->services()->tasks()->parallel([
         'first' => fn() => ['ok' => true],
         'second' => fn() => ['count' => 2],
     ]);
@@ -28,16 +27,13 @@ $api->get('/fetch', function () use ($api): Response {
     }
 });
 
-$api->get('/broadcast', function (): Response {
-    PHAPI::app()?->realtime()->broadcast('updates', ['ok' => true]);
+$api->get('/broadcast', function () use ($api): Response {
+    $api->services()->realtime()->broadcast('updates', ['ok' => true]);
     return Response::json(['sent' => true]);
 });
 
-$api->get('/redis', function (): Response {
-    $redis = PHAPI::app()?->redis();
-    if ($redis === null) {
-        return Response::error('Redis client unavailable', 500);
-    }
+$api->get('/redis', function () use ($api): Response {
+    $redis = $api->services()->redis();
 
     try {
         $redis->set('phapi:hello', 'world', 30);
@@ -48,11 +44,8 @@ $api->get('/redis', function (): Response {
     }
 });
 
-$api->get('/mysql', function (): Response {
-    $mysql = PHAPI::app()?->mysql();
-    if ($mysql === null) {
-        return Response::error('MySQL client unavailable', 500);
-    }
+$api->get('/mysql', function () use ($api): Response {
+    $mysql = $api->services()->mysql();
 
     try {
         $rows = $mysql->query('SELECT 1 AS ok');
@@ -62,6 +55,6 @@ $api->get('/mysql', function (): Response {
     }
 });
 
-$api->get('/jobs', function (): Response {
-    return Response::json(['jobs' => PHAPI::app()?->jobLogs()]);
+$api->get('/jobs', function () use ($api): Response {
+    return Response::json(['jobs' => $api->jobLogs()]);
 });

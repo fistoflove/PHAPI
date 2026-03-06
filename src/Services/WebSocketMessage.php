@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHAPI\Services;
 
+/**
+ * @api
+ */
 final class WebSocketMessage
 {
     public function __construct(
@@ -35,4 +38,3 @@ final class WebSocketMessage
         return $decoded;
     }
 }
-

@@ -9,6 +9,9 @@ use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\Server\HttpKernel;
 
+/**
+ * @api
+ */
 class SwooleDriver implements RuntimeInterface, WebSocketDriverInterface
 {
     private string $host;

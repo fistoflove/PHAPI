@@ -19,7 +19,9 @@ final class HttpKernelFactory
     {
         $router = new Router();
         $middleware = new MiddlewareManager();
-        $errorHandler = new ErrorHandler((bool)($config['debug'] ?? false));
+        $cwd = getcwd();
+        $basePath = (string) ($config['base_path'] ?? ($cwd !== false ? $cwd : ''));
+        $errorHandler = new ErrorHandler((bool)($config['debug'] ?? false), $basePath);
         $container = new Container();
         $kernel = new HttpKernel(
             $router,

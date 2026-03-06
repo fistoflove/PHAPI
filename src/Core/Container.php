@@ -9,6 +9,9 @@ use PHAPI\Exceptions\NotFoundException;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 
+/**
+ * @api
+ */
 class Container implements ContainerInterface
 {
     /**

@@ -20,7 +20,7 @@ Examples:
 - `php bin/phapi-run example.php`
 
 ## Coding Style & Naming Conventions
-- PHP 8.0+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
+- PHP 8.1+, PSR-12 style, `declare(strict_types=1);` everywhere in `src/`.
 - Use meaningful, descriptive class names; prefer `PascalCase` for classes and `camelCase` for methods.
 - Formatting is enforced via PHP-CS-Fixer (`.php-cs-fixer.php`).
 - Static analysis via PHPStan (`phpstan.neon`, strict rules).
@@ -29,7 +29,7 @@ Examples:
 - Framework: PHPUnit (`phpunit.xml`).
 - Tests live in `tests/` and follow `*Test.php` naming.
 - Add tests for new public APIs, runtime behavior, and examples where feasible.
-- Use `PHAPI::kernel()` to exercise routes in memory when unit testing.
+- Use `$api->kernel()` to exercise routes in memory when unit testing.
 
 ## Commit & Pull Request Guidelines
 - Recent commits use Conventional Commits (e.g., `feat:`) and simple version tags (e.g., `0.1`).

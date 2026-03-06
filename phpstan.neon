@@ -1,10 +1,13 @@
 includes:
     - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/phpat/phpat/extension.neon
+    - vendor/tomasvotruba/unused-public/config/extension.neon
 
 parameters:
     level: 8
     paths:
         - src
+        - tests/Architecture
     stubFiles:
         - stubs/swoole.stub.php
     scanFiles:
@@ -15,3 +18,14 @@ parameters:
     checkMissingVarTagTypehint: true
     parallel:
         maximumNumberOfProcesses: 0
+    unused_public:
+        methods: true
+        local_methods: false
+        properties: true
+        constants: true
+
+services:
+    -
+        class: PHAPI\Tests\Architecture\LayerDependencyTest
+        tags:
+            - phpat.test

@@ -19,6 +19,7 @@ namespace PHAPI\Server;
  *   host: array<int, string>|string|null,
  *   matchedParams?: array<string, string>
  * }
+ * @api
  */
 class Router
 {

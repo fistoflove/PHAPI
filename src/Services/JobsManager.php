@@ -8,6 +8,7 @@ namespace PHAPI\Services;
  * @phpstan-type JobConfig array{interval: int, handler: callable(mixed ...$args): mixed, log_enabled: bool, log_file: string|null, lock_mode: string}
  * @phpstan-type JobRecord array{job: string, status: string, started_at: string|null, duration_ms: float|null, output: string, result: mixed, error?: string}
  * @phpstan-type JobLock array{handle: resource, path: string}
+ * @api
  */
 class JobsManager
 {

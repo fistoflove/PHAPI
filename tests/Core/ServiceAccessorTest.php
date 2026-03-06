@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Tests\Core;
 
-use PHAPI\Core\Container;
 use PHAPI\Core\ServiceAccessor;
 use PHPUnit\Framework\TestCase;
 

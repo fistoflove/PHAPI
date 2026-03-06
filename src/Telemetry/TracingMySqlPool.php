@@ -17,6 +17,7 @@ use PHAPI\Services\MySqlPool;
  * lower-level pool operations (`acquire`, `releaseConnection`,
  * `withConnection`, `current`) delegate directly to avoid double-
  * spanning when called by query/execute internally.
+ * @api
  */
 final class TracingMySqlPool
 {

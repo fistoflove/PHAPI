@@ -28,6 +28,11 @@ Thumbs.db
 # Runtime
 /var/
 
+# Environment / secrets
+.env
+.env.*
+!.env.supabase.example
+
 # Build artifacts
 *.phar
 build/

@@ -6,6 +6,9 @@ namespace PHAPI\HTTP;
 
 use PHAPI\PHAPI;
 
+/**
+ * @api
+ */
 class RouteBuilder
 {
     protected PHAPI $api;

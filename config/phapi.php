@@ -50,6 +50,21 @@ return [
         'model_id' => '',
         'api_token' => '',
     ],
+    'supabase' => [
+        'url' => '',          // e.g. 'https://yourproject.supabase.co'
+        'anon_key' => '',
+        'service_role_key' => '',
+        'schema' => 'public',
+        'timeout' => 5.0,
+        'retries' => 0,
+        // Declarative bucket provisioning — auto-created on worker start (worker 0).
+        // Each bucket is ensured in parallel via Swoole coroutines.
+        // 'buckets' => [
+        //     'avatars' => ['public' => true],
+        //     'documents' => ['public' => false, 'file_size_limit' => 10485760],
+        // ],
+        'buckets' => [],
+    ],
     'google_oidc' => [
         'certs_url' => 'https://www.googleapis.com/oauth2/v3/certs',
         'cache_ttl' => 300,

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHAPI\HTTP;
 
+/**
+ * @api
+ */
 class Request
 {
     private string $method;

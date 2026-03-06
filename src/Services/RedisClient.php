@@ -7,4 +7,3 @@ namespace PHAPI\Services;
 final class RedisClient extends SwooleRedisClient
 {
 }
-

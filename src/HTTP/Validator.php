@@ -8,6 +8,7 @@ use PHAPI\Exceptions\ValidationException;
 
 /**
  * Simple, fluent validation API
+ * @api
  */
 class Validator
 {

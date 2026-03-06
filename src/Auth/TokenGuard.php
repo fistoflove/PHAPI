@@ -7,6 +7,9 @@ namespace PHAPI\Auth;
 use PHAPI\HTTP\Request;
 use PHAPI\HTTP\RequestContext;
 
+/**
+ * @api
+ */
 class TokenGuard implements GuardInterface
 {
     /**

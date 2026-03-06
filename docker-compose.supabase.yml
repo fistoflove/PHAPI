@@ -1,0 +1,159 @@
+# Supabase integration test stack
+# Usage: docker compose -f docker-compose.supabase.yml up -d
+#        docker compose -f docker-compose.supabase.yml down -v
+
+services:
+  supabase-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-supabase_test}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+    volumes:
+      - ./docker/supabase/init.sql:/docker-entrypoint-initdb.d/00-init.sql
+    ports:
+      - "54322:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+    tmpfs:
+      - /var/lib/postgresql/data
+
+  # Inbucket — local SMTP server for capturing OTP emails
+  supabase-inbucket:
+    image: inbucket/inbucket:3.0.4
+    ports:
+      - "9001:9000"   # Web UI
+      - "2500:2500"   # SMTP
+      - "1100:1100"   # REST API
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9000/status || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
+
+  supabase-auth:
+    image: supabase/gotrue:v2.170.0
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-inbucket:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:9999
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@supabase-db:5432/supabase_test?sslmode=disable
+      GOTRUE_SITE_URL: http://localhost:9999
+      GOTRUE_URI_ALLOW_LIST: ""
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: "3600"
+      GOTRUE_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long-for-testing}
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_EXTERNAL_PHONE_ENABLED: "false"
+      GOTRUE_SMS_AUTOCONFIRM: "false"
+      GOTRUE_SMTP_HOST: supabase-inbucket
+      GOTRUE_SMTP_PORT: "2500"
+      GOTRUE_SMTP_ADMIN_EMAIL: noreply@phapi-test.local
+      GOTRUE_SMTP_MAX_FREQUENCY: "1s"
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: "/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: "/auth/v1/verify"
+      GOTRUE_MAILER_URLPATHS_RECOVERY: "/auth/v1/verify"
+    ports:
+      - "9999:9999"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9999/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  supabase-rest:
+    image: postgrest/postgrest:v12.2.3
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://authenticator:postgres@supabase-db:5432/supabase_test
+      PGRST_DB_SCHEMAS: public
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long-for-testing}
+      PGRST_DB_USE_LEGACY_GUCS: "false"
+      PGRST_APP_SETTINGS_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long-for-testing}
+      PGRST_APP_SETTINGS_JWT_EXP: "3600"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3000/ || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  supabase-storage:
+    image: supabase/storage-api:v1.14.5
+    depends_on:
+      supabase-db:
+        condition: service_healthy
+      supabase-auth:
+        condition: service_healthy
+    environment:
+      ANON_KEY: ${SUPABASE_ANON_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzAwMDAwMDAwLCJleHAiOjQxMDI0NDQ4MDB9.IbzzANYcwCWU72DSTJjxoeyUS6WuH8PVQQoP1ToYcrk}
+      SERVICE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIiwiaXNzIjoic3VwYWJhc2UiLCJpYXQiOjE3MDAwMDAwMDAsImV4cCI6NDEwMjQ0NDgwMH0.BHXMujlqt3YKpGKGh2KQhEIyef5oWmD0QqY8JfPFm-Q}
+      POSTGREST_URL: http://supabase-rest:3000
+      PGRST_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long-for-testing}
+      DATABASE_URL: postgres://postgres:postgres@supabase-db:5432/supabase_test
+      FILE_SIZE_LIMIT: "52428800"
+      STORAGE_BACKEND: file
+      FILE_STORAGE_BACKEND_PATH: /var/lib/storage
+      TENANT_ID: stub
+      REGION: local
+      GLOBAL_S3_BUCKET: stub
+      IS_MULTITENANT: "false"
+      AUTH_JWT_SECRET: ${SUPABASE_JWT_SECRET:-super-secret-jwt-token-with-at-least-32-characters-long-for-testing}
+      AUTH_JWT_ALGORITHM: HS256
+      STORAGE_S3_REGION: local
+      ENABLE_IMAGE_TRANSFORMATION: "false"
+    ports:
+      - "5000:5000"
+    volumes:
+      - supabase-storage-data:/var/lib/storage
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:5000/status || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 15
+
+  # Kong API gateway - routes /auth, /rest, /storage to the right services
+  # This is the single entrypoint the tests talk to (matches real Supabase URL pattern)
+  supabase-kong:
+    image: kong:3.4
+    depends_on:
+      supabase-auth:
+        condition: service_healthy
+      supabase-rest:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /etc/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    volumes:
+      - ./docker/supabase/kong.yml:/etc/kong/kong.yml:ro
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  supabase-storage-data:

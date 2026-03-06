@@ -8,6 +8,9 @@ use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\RuntimeInterface;
 use PHAPI\Runtime\RuntimeSelector;
 
+/**
+ * @api
+ */
 final class RuntimeManager
 {
     /**

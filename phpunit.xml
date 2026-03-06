@@ -10,6 +10,7 @@
     <testsuites>
         <testsuite name="default">
             <directory>tests</directory>
+            <exclude>tests/Architecture</exclude>
         </testsuite>
     </testsuites>
     <source>

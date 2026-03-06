@@ -7,6 +7,7 @@ namespace PHAPI\Logging;
 /**
  * Simple logger implementation
  * Can be extended to support PSR-3 or other logging backends
+ * @api
  */
 class Logger
 {

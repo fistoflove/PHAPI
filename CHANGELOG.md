@@ -2,6 +2,23 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.6.0 — 2026-03-06
+
+### Added
+- **Native Supabase Integration** — Auth, Database (PostgREST), and Storage clients
+  - `SupabaseProvider` service provider with config validation and container bindings
+  - `SupabaseFactory` singleton for creating request-scoped `SupabaseContext` instances
+  - `SupabaseContext` with lazy `auth()`, `db()`, `storage()` accessors
+  - `AuthClient` — GoTrue client: `user()`, `signInWithPassword()`, `signUp()`, `signInWithOtp()`, `verifyOtp()`, `refreshToken()`, `signOut()`
+  - `AdminClient` — service-role admin: `listUsers()`, `getUser()`, `createUser()`, `updateUser()`, `deleteUser()`
+  - `DatabaseClient` + `QueryBuilder` — fluent PostgREST queries with immutable chaining, filters, ordering, pagination, insert/update/upsert/delete
+  - `StorageClient` — bucket management, file upload/download/delete/copy/move, public URLs, signed URLs
+  - `SupabaseAuthMiddleware` (`supabase.auth`) — bearer token extraction with custom resolver support
+  - `SupabaseRoleMiddleware` (`supabase.role`) — JWT role-based access control
+  - `SupabaseTransport` — Swoole coroutine HTTP transport supporting all HTTP methods
+  - Typed exception hierarchy: `SupabaseException`, `SupabaseAuthException`, `SupabaseDatabaseException`, `SupabaseStorageException`
+  - 92 unit tests covering all components
+
 ## v1.5.1 — 2026-03-06
 
 ### Fixed

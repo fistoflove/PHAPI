@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHAPI\Tests;
 
 use PHAPI\HTTP\Response;
-use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 /**

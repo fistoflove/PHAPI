@@ -3,7 +3,6 @@
 require __DIR__ . '/../vendor/autoload.php';
 
 use PHAPI\PHAPI;
-use PHAPI\Core\Container;
 
 $api = new PHAPI([
     'host' => '0.0.0.0',
@@ -53,9 +52,7 @@ $api = new PHAPI([
 $api->enableCORS();
 $api->enableSecurityHeaders();
 $api->container()->singleton(\DateTimeInterface::class, \DateTimeImmutable::class);
-$api->extend('greeting', function (Container $container): string {
-    return 'Hello from PHAPI';
-});
+$api->container()->singleton('greeting', fn(): string => 'Hello from PHAPI');
 $api->onBoot(function (): void {
     // Boot-time hook (Swoole only).
 });
