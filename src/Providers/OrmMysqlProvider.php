@@ -21,6 +21,12 @@ final class OrmMysqlProvider implements ServiceProviderInterface
 {
     public function register(Container $container, array $config): void
     {
+        if (!class_exists(ConnectionFactory::class)) {
+            throw new ConfigException(
+                'Hyperf database packages required for ORM. Install: composer require hyperf/config hyperf/database hyperf/db-connection'
+            );
+        }
+
         $ormConfig = $this->resolveOrmMysqlConfig($config);
         $this->validateOrmMysqlConfig($ormConfig);
 

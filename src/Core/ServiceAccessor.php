@@ -19,6 +19,7 @@ use PHAPI\Services\TaskRunner;
  *
  * This delegate is independently testable and holds the config-based
  * factory logic for MySQL, Redis, OpenFGA, and container-resolved services.
+ * @api
  */
 class ServiceAccessor
 {
@@ -117,7 +118,8 @@ class ServiceAccessor
         if (!isset($this->singletons[$key])) {
             $config = $this->config['google_oidc'] ?? [];
             $certsUrl = (string) ($config['certs_url'] ?? 'https://www.googleapis.com/oauth2/v3/certs');
-            $this->singletons[$key] = new GoogleIdTokenVerifier($certsUrl, $this->http());
+            $cacheTtl = (int) ($config['cache_ttl'] ?? 300);
+            $this->singletons[$key] = new GoogleIdTokenVerifier($certsUrl, $this->http(), null, null, 60, $cacheTtl);
         }
 
         /** @var GoogleIdTokenVerifier */

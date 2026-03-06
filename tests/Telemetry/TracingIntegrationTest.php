@@ -348,10 +348,9 @@ class FileSpanExporter implements \\OpenTelemetry\\SDK\\Trace\\SpanExporterInter
 // Routes.
 \$api->get('/ping', fn() => Response::json(['pong' => true]));
 
-\$api->get('/slow', function () {
-    \$req = PHAPI::request();
+\$api->get('/slow', function (Request \$request) {
     \\Swoole\\Coroutine::sleep(0.05); // 50ms delay to test concurrency
-    return Response::json(['id' => \$req?->query('id')]);
+    return Response::json(['id' => \$request->query('id')]);
 });
 
 \$api->get('/throw', fn() => throw new \\RuntimeException('Intentional test error'));

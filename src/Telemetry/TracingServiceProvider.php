@@ -7,10 +7,10 @@ namespace PHAPI\Telemetry;
 use OpenTelemetry\API\Trace\Propagation\TraceContextPropagator;
 use OpenTelemetry\API\Trace\TracerInterface;
 use OpenTelemetry\API\Trace\TracerProviderInterface;
+use OpenTelemetry\Context\Context;
 use OpenTelemetry\Contrib\Context\Swoole\SwooleContextStorage;
 use OpenTelemetry\Contrib\Otlp\OtlpHttpTransportFactory;
 use OpenTelemetry\Contrib\Otlp\SpanExporter;
-use OpenTelemetry\Context\Context;
 use OpenTelemetry\SDK\Common\Attribute\Attributes;
 use OpenTelemetry\SDK\Common\Time\ClockFactory;
 use OpenTelemetry\SDK\Resource\ResourceInfo;
@@ -19,6 +19,7 @@ use OpenTelemetry\SDK\Trace\TracerProvider;
 use OpenTelemetry\SemConv\ResourceAttributes;
 use PHAPI\Core\Container;
 use PHAPI\Core\ServiceProviderInterface;
+use PHAPI\Exceptions\ConfigException;
 use PHAPI\PHAPI;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\MySqlPool;
@@ -36,6 +37,12 @@ final class TracingServiceProvider implements ServiceProviderInterface
 
         if (!$this->isEnabled($telemetryConfig)) {
             return;
+        }
+
+        if (!class_exists(TracerProviderInterface::class)) {
+            throw new ConfigException(
+                'OpenTelemetry packages required for tracing. Install: composer require open-telemetry/api open-telemetry/sdk open-telemetry/context-swoole open-telemetry/exporter-otlp open-telemetry/sem-conv'
+            );
         }
 
         $this->installSwooleContextStorage();

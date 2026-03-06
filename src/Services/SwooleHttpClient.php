@@ -8,6 +8,11 @@ use PHAPI\Exceptions\HttpRequestException;
 
 class SwooleHttpClient implements HttpClient
 {
+    public function __construct(
+        private readonly float $timeout = 5.0,
+    ) {
+    }
+
     /**
      * @param string $url
      * @param string $method
@@ -39,7 +44,7 @@ class SwooleHttpClient implements HttpClient
         }
 
         $client = new \Swoole\Coroutine\Http\Client($host, $port, $scheme === 'https');
-        $client->set(['timeout' => 5]);
+        $client->set(['timeout' => $this->timeout]);
 
         $defaultHeaders = [
             'Accept' => 'application/json',

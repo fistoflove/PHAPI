@@ -2,9 +2,32 @@
 
 All notable changes to PHAPI are documented in this file.
 
+## v1.5.1 — 2026-03-06
+
+### Fixed
+- TracingIntegrationTest test server uses removed `PHAPI::request()`; replaced with `Request` type-hint
+- TracingMySqlPoolTest errors instead of skipping when MySQL unavailable
+- Job autowiring test fails due to unwritable lock directory
+- MySqlPool now health-checks borrowed connections; stale connections are replaced
+
+### Changed
+- SwooleHttpClient timeout configurable via `http_timeout` config key (default: 5.0s)
+- GoogleIdTokenVerifier cache TTL configurable via `google_oidc.cache_ttl` (default: 300s)
+- `guzzlehttp/guzzle` removed (was unused)
+- `hyperf/*` and `open-telemetry/*` moved from `require` to `suggest`
+
+### Added
+- 20 new JobsManager tests covering registration, execution, locking, logging, rotation, state
+- `class_exists` guards in OrmMysqlProvider and TracingServiceProvider with install instructions
+
 ## v1.5.0 — 2026-02-18
 
 ### Added
+- `PHAPIBuilder` (`src/Core/PHAPIBuilder.php`) — fluent, validated configuration builder. Use `PHAPI::builder()->...->build()` instead of `new PHAPI([...])`
+- `ServiceAccessor` (`src/Core/ServiceAccessor.php`) — centralized lazy-instantiation of service clients (`mysql()`, `redis()`, `openfga()`, `http()`, `database()`, `tasks()`, `realtime()`, `googleIdTokenVerifier()`). Accessed via `$api->services()`
+- `GoogleIdTokenVerifier` (`src/Auth/GoogleIdTokenVerifier.php`) — Google OIDC ID token verification with RS256 JWT validation, JWKS certificate fetching and caching
+- `AuthException` (`src/Auth/AuthException.php`) — thrown by `GoogleIdTokenVerifier` on verification failures
+- `google_oidc` config block for certificate URL and audience configuration
 - OpenTelemetry tracing module (`src/Telemetry/`) with opt-in `TracingServiceProvider`
 - `TracingMiddleware` — global middleware for root server spans with W3C trace context extraction
 - `TracingHttpClient` — decorator for outbound HTTP spans with cross-service W3C context propagation
@@ -15,7 +38,15 @@ All notable changes to PHAPI are documented in this file.
 - `HeadersGetter` — W3C `PropagationGetterInterface` implementation for request header extraction
 - New dependencies: `open-telemetry/api`, `open-telemetry/sdk`, `open-telemetry/context-swoole`, `open-telemetry/exporter-otlp`, `open-telemetry/sem-conv`
 - 37 new Telemetry tests (18 unit + 19 integration using real MySQL and Redis)
+- 7 Auth unit tests (GoogleIdTokenVerifier)
 - Test coverage report at `docs/test-coverage.md`
+
+### Breaking Changes
+- **Static globals removed**: `PHAPI::app()`, `PHAPI::lastInstance()`, `PHAPI::request()`, `PHAPI::db()` — no global application instance; pass `$api` explicitly or type-hint `Request` in handlers
+- **Service proxy methods removed**: `$api->mysql()`, `$api->redis()`, `$api->openfga()`, `$api->http()`, `$api->database()`, `$api->tasks()`, `$api->realtime()` — use `$api->services()->...()` instead
+- **DI shortcuts removed**: `$api->extend()` and `$api->resolve()` — use `$api->container()->singleton()` and `$api->container()->get()` instead
+- **ServiceProviderInterface changed**: `register(Container $container, PHAPI $app)` is now `register(Container $container, array $config)`
+- **PHAPI class decomposed**: Monolithic class split into focused traits (`RoutesRequests`, `ManagesMiddleware`, `ManagesRuntime`, `SchedulesJobs`). Public API is unchanged for routing/middleware/hooks
 
 ### Fixed
 - `SwooleServerTest` hardcoded `/workspaces/PHAPI/vendor/autoload.php` path replaced with dynamic resolution
@@ -26,7 +57,7 @@ All notable changes to PHAPI are documented in this file.
 ### Added
 - OpenFGA authorization client (`OpenFgaClient` interface + `OpenFgaHttpClient` implementation) for Zanzibar-based fine-grained authorization
 - `OpenFgaException` for OpenFGA API error context (carries `fgaCode`, `fgaMessage`, `httpStatus`)
-- `PHAPI::openfga()` accessor method for lazy-initialized OpenFGA client
+- `$api->services()->openfga()` accessor method for lazy-initialized OpenFGA client (via `ServiceAccessor`)
 - `OpenFgaClient` DI singleton registration in `AppBootstrapper`
 - `openfga` config block in `config/phapi.php` (`api_url`, `store_id`, `model_id`, `api_token`)
 - OpenFGA service in Docker Compose development environment (MySQL-backed, with migrate init container)

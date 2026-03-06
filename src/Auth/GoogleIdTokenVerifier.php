@@ -6,6 +6,9 @@ namespace PHAPI\Auth;
 
 use PHAPI\Services\HttpClient;
 
+/**
+ * @api
+ */
 final class GoogleIdTokenVerifier
 {
     private const ALLOWED_ISSUERS = [
@@ -33,6 +36,7 @@ final class GoogleIdTokenVerifier
         ?callable $certificateProvider = null,
         ?callable $clock = null,
         private readonly int $clockSkewSeconds = 60,
+        private readonly int $cacheTtl = 300,
     ) {
         $this->certificateProvider = $certificateProvider;
         $this->clock = $clock ?? static fn (): int => time();
@@ -147,7 +151,7 @@ final class GoogleIdTokenVerifier
             $result = call_user_func($this->certificateProvider, $this->certsUrl);
 
             $this->cachedCertificates = $this->normalizeCertificates($result);
-            $this->cacheExpiresAt = $now + 300;
+            $this->cacheExpiresAt = $now + $this->cacheTtl;
 
             return $this->cachedCertificates;
         }
@@ -169,7 +173,7 @@ final class GoogleIdTokenVerifier
         }
 
         $this->cachedCertificates = $this->normalizeCertificates($decoded);
-        $this->cacheExpiresAt = $now + 300;
+        $this->cacheExpiresAt = $now + $this->cacheTtl;
 
         return $this->cachedCertificates;
     }

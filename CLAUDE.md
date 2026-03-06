@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What Is PHAPI
 
-PHAPI is a lightweight PHP 8.0+ micro MVC framework built exclusively on Swoole. It provides async HTTP routing, middleware, DI container, validation, authentication, job scheduling, WebSocket support, and connection pooling for Redis/MySQL.
+PHAPI is a lightweight PHP 8.1+ micro MVC framework built exclusively on Swoole. It provides async HTTP routing, middleware, DI container, validation, authentication, job scheduling, WebSocket support, and connection pooling for Redis/MySQL.
 
 ## Commands
 
@@ -29,7 +29,7 @@ php bin/phapi-run example.php
 
 ## Architecture
 
-**Entry point**: `src/PHAPI.php` — the main application class. Exposes route registration (`get()`, `post()`, etc.), middleware, lifecycle hooks, service accessors (`http()`, `redis()`, `mysql()`, `tasks()`, `realtime()`), and `run()` to start the Swoole server.
+**Entry point**: `src/PHAPI.php` — the main application class. Created via `PHAPI::builder()` (returns `PHAPIBuilder`). Exposes route registration (`get()`, `post()`, etc.), middleware, lifecycle hooks, `services()` accessor (returns `ServiceAccessor` for `mysql()`, `redis()`, `http()`, `tasks()`, `realtime()`, `openfga()`, `database()`, `googleIdTokenVerifier()`), and `run()` to start the Swoole server.
 
 **Request lifecycle**: `PHAPI` → `HttpKernel` (dispatches requests) → `Router` (matches routes via first-segment indexing) → `MiddlewareManager` (global + per-route pipeline) → handler callable/class → `Response`.
 
@@ -54,7 +54,7 @@ php bin/phapi-run example.php
 
 **HttpClient custom headers**: All HttpClient methods (`getJson`, `getJsonWithMeta`, `postFormWithMeta`, `postJson`, `postJsonWithMeta`) accept an optional `array $headers = []` parameter for custom HTTP headers (e.g., `Authorization`, `Content-Type`).
 
-**OpenFGA client** (`src/Services/OpenFgaClient.php`): Interface + implementation (`OpenFgaHttpClient`) for Zanzibar-based fine-grained authorization via OpenFGA. Accessed via `$app->openfga()`. Uses PHAPI's `HttpClient` internally — no additional dependencies.
+**OpenFGA client** (`src/Services/OpenFgaClient.php`): Interface + implementation (`OpenFgaHttpClient`) for Zanzibar-based fine-grained authorization via OpenFGA. Accessed via `$app->services()->openfga()`. Uses PHAPI's `HttpClient` internally — no additional dependencies.
 
 Config (`config/phapi.php`):
 ```php
@@ -70,9 +70,11 @@ Methods: `check(user, relation, object): bool`, `batchCheck(checks): array`, `wr
 
 Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
 
-20 unit tests (MockHttpClient, no Swoole needed) + 14 integration tests (`@group openfga`, require Docker OpenFGA instance). Integration tests cover all 10 `OpenFgaClient` methods including transitive userset resolution.
+21 unit tests (MockHttpClient, no Swoole needed) + 14 integration tests (`@group openfga`, require Docker OpenFGA instance). Integration tests cover all 10 `OpenFgaClient` methods including transitive userset resolution.
 
-**Testing approach**: Use `PHAPI::kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
+**Google OIDC** (`src/Auth/GoogleIdTokenVerifier.php`): Verifies Google ID tokens (RS256 JWTs) with automatic JWKS certificate fetching and caching. Accessed via `$app->services()->googleIdTokenVerifier($audience)`. Throws `AuthException` (`src/Auth/AuthException.php`) on verification failures (invalid token, expired, bad audience, etc.).
+
+**Testing approach**: Use `$api->kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
 
 ## Coding Standards
 
@@ -84,8 +86,8 @@ Throws `OpenFgaException` on API errors (carries `fgaCode()`, `httpStatus()`).
 
 ## Exception Hierarchy
 
-All custom exceptions extend `PhapiException` (`src/Exceptions/`). HTTP-related: `NotFoundException`, `MethodNotAllowedException`, `ForbiddenException`, `UnauthorizedException`. Domain: `ValidationException`, `DatabaseException`, `ContainerException`, `ConfigException`, `HttpRequestException`.
+All custom exceptions extend `PhapiException` (`src/Exceptions/`). HTTP-related: `NotFoundException`, `MethodNotAllowedException`, `ForbiddenException`, `UnauthorizedException`. Domain: `ValidationException`, `DatabaseException`, `ContainerException`, `ConfigException`, `HttpRequestException`, `OpenFgaException`. Auth: `AuthException` (`src/Auth/AuthException.php`) extends `RuntimeException` directly (not `PhapiException`) — thrown by `GoogleIdTokenVerifier`.
 
 ## Configuration
 
-Default config in `config/phapi.php`. Key settings: `host`, `port`, `debug`, `enable_websockets`, `swoole_settings` (passed to `Swoole\Server::set()`), `providers`, `redis`, `mysql`, `orm`.
+Default config in `config/phapi.php`. Key settings: `host`, `port`, `debug`, `enable_websockets`, `swoole_settings` (passed to `Swoole\Server::set()`), `providers`, `redis`, `mysql`, `orm`, `http_timeout` (float, default 5.0 — HTTP client request timeout), `google_oidc` (certs URL + `cache_ttl` for JWKS certificate cache in seconds, default 300), `telemetry` (OpenTelemetry tracing config). Optional dependencies: `hyperf/*` (ORM) and `open-telemetry/*` (tracing) are in `suggest` — install explicitly when needed.

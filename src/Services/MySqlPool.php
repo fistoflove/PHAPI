@@ -126,7 +126,7 @@ final class MySqlPool
     private function borrow(): PDO
     {
         if ($this->currentCoroutineId() === null) {
-            if ($this->sharedClient instanceof PDO) {
+            if ($this->sharedClient instanceof PDO && $this->isHealthy($this->sharedClient)) {
                 return $this->sharedClient;
             }
 
@@ -146,7 +146,21 @@ final class MySqlPool
             throw new \RuntimeException('MySQL pool timed out waiting for an available connection.');
         }
 
+        if (!$this->isHealthy($client)) {
+            return $this->createConnection();
+        }
+
         return $client;
+    }
+
+    private function isHealthy(PDO $pdo): bool
+    {
+        try {
+            $pdo->query('SELECT 1');
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function release(PDO $pdo): void

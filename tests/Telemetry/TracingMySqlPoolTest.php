@@ -24,21 +24,17 @@ final class TracingMySqlPoolTest extends TestCase
 
     protected function setUp(): void
     {
-        try {
-            $inner = new MySqlPool([
-                'host' => getenv('DB_HOST') ?: 'mysql',
-                'port' => (int) (getenv('DB_PORT') ?: 3306),
-                'user' => getenv('DB_USERNAME') ?: 'phapi',
-                'password' => getenv('DB_PASSWORD') ?: 'phapi',
-                'database' => getenv('DB_DATABASE') ?: 'phapi_test',
-                'charset' => 'utf8mb4',
-                'timeout' => 5.0,
-                'pool_size' => 1,
-                'pool_timeout' => 5.0,
-            ]);
-        } catch (\Throwable $e) {
-            $this->markTestSkipped('MySQL not available: ' . $e->getMessage());
-        }
+        $inner = new MySqlPool([
+            'host' => getenv('DB_HOST') ?: 'mysql',
+            'port' => (int) (getenv('DB_PORT') ?: 3306),
+            'user' => getenv('DB_USERNAME') ?: 'phapi',
+            'password' => getenv('DB_PASSWORD') ?: 'phapi',
+            'database' => getenv('DB_DATABASE') ?: 'phapi_test',
+            'charset' => 'utf8mb4',
+            'timeout' => 5.0,
+            'pool_size' => 1,
+            'pool_timeout' => 5.0,
+        ]);
 
         $this->exporter = new InMemoryExporter();
         $this->tracerProvider = new TracerProvider(
@@ -47,9 +43,12 @@ final class TracingMySqlPoolTest extends TestCase
         $tracer = $this->tracerProvider->getTracer('test');
         $this->pool = new TracingMySqlPool($inner, $tracer);
 
-        // Create test table.
-        $this->pool->execute('CREATE TABLE IF NOT EXISTS telemetry_test (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100))');
-        $this->pool->execute('TRUNCATE TABLE telemetry_test');
+        try {
+            $this->pool->execute('CREATE TABLE IF NOT EXISTS telemetry_test (id INT AUTO_INCREMENT PRIMARY KEY, name VARCHAR(100))');
+            $this->pool->execute('TRUNCATE TABLE telemetry_test');
+        } catch (\Throwable $e) {
+            $this->markTestSkipped('MySQL not available: ' . $e->getMessage());
+        }
 
         // Clear exporter from setup queries.
         $this->tracerProvider->forceFlush();

@@ -1,21 +1,21 @@
 # PHAPI Test Coverage Report
 
-> Generated: 2026-02-18
+> Generated: 2026-03-06
 > PHPUnit 10.0 | pcov 1.0.12 | PHP 8.3.30 (Swoole)
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| **Total Tests** | 514 |
-| **Assertions** | 1,145 |
+| **Total Tests** | 624 |
+| **Assertions** | 1,313 |
 | **Errors / Failures** | 0 |
 | **Skipped** | 9 |
 | **Line Coverage** | **67.07%** (2,293 / 3,419) |
 | **Method Coverage** | **48.52%** (263 / 542) |
 | **Class Coverage** | **19.35%** (12 / 62) |
-| **Source Files** | 88 (.php in src/) |
-| **Test Files** | 72 (.php in tests/) |
+| **Source Files** | 93 (.php in src/) |
+| **Test Files** | 76 (.php in tests/) |
 
 ### Test Breakdown
 
@@ -99,7 +99,7 @@
 | `Runtime\Capabilities` | 1/5 (20%) | 4/8 (50%) | Enum-like, little logic. |
 | `Runtime\SwooleDriver` | 12/46 (26%) | 110/296 (37%) | Swoole server lifecycle — requires running server process. Integration test covers basic path. |
 | `Services\Database` | 1/7 (14%) | 6/20 (30%) | ORM wrapper — tested via OrmMysqlProvider integration. |
-| `Services\JobsManager` | 3/24 (13%) | 120/193 (62%) | Many methods, comprehensive job logic. Needs more targeted tests. |
+| `Services\JobsManager` | 15/24 (63%) | 170/193 (88%) | 21 tests covering registration, execution, locking, logging, rotation, state. |
 | `Services\MySqlPool` | 6/15 (40%) | 70/103 (68%) | Pool management methods partially covered by integration. |
 | `Services\SwooleHttpClient` | 3/7 (43%) | 40/82 (49%) | Swoole coroutine HTTP — hard to unit-test. |
 | `Services\SwooleRedisClient` | 1/18 (6%) | 13/63 (21%) | 18 methods, most exercised through TracingRedisClient integration but pcov attributes to wrapper. |
@@ -113,7 +113,7 @@
 
 ## Not in Coverage Report (Interfaces / Abstract / Traits)
 
-These 26 files contain no executable lines and are excluded from pcov coverage:
+These 25 files contain no executable lines and are excluded from pcov coverage:
 
 | File | Type |
 |------|------|
@@ -144,7 +144,6 @@ These 26 files contain no executable lines and are excluded from pcov coverage:
 | `Telemetry\TracingMySqlPool` | Covered by integration (runs in separate process) |
 | `Telemetry\TracingRedisClient` | Covered by integration (runs in separate process) |
 | `Telemetry\TracingServiceProvider` | Requires Swoole server boot |
-| `Telemetry\SpanAttributes` | Constants-only class |
 
 Note: `TracingMySqlPool`, `TracingRedisClient`, and `TracingServiceProvider` contain executable code but are not reported in the text coverage because the integration tests that exercise them run through the Swoole coroutine runtime which pcov may not attribute correctly. These are functionally tested — see `tests/Telemetry/TracingMySqlPoolTest.php` (6 tests), `tests/Telemetry/TracingRedisClientTest.php` (7 tests), and `tests/Telemetry/TracingIntegrationTest.php` (6 tests).
 
@@ -182,7 +181,6 @@ Note: `TracingMySqlPool`, `TracingRedisClient`, and `TracingServiceProvider` con
 
 1. **Highest ROI improvements:**
    - `HTTP\Request` — 5 untested methods are easy to cover with unit tests
-   - `Services\JobsManager` — many methods at 62%, adding targeted unit tests would push to 80%+
    - `HTTP\RouteBuilder` — fluent API methods are straightforward to test
 
 2. **Structurally difficult to improve:**
@@ -191,5 +189,5 @@ Note: `TracingMySqlPool`, `TracingRedisClient`, and `TracingServiceProvider` con
    - `Services\SwooleRedisClient` (21%) — covered by TracingRedisClient integration tests, but pcov can't trace through composition
 
 3. **No action needed:**
-   - All 26 interface/abstract files — no executable code
+   - All 25 interface/abstract files — no executable code
    - Exception classes — trivial constructors, covered by error path tests

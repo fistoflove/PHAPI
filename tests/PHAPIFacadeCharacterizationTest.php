@@ -13,7 +13,6 @@ use PHAPI\PHAPI;
 use PHAPI\Runtime\DriverCapabilities;
 use PHAPI\Runtime\RuntimeInterface;
 use PHAPI\Server\HttpKernel;
-use PHAPI\Server\Router;
 use PHAPI\Services\HttpClient;
 use PHAPI\Services\MySqlPool;
 use PHAPI\Services\OpenFgaClient;
@@ -560,7 +559,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->onBoot(function (): void {});
+        $result = $api->onBoot(function (): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -569,7 +569,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->onWorkerStart(function ($server, int $workerId): void {});
+        $result = $api->onWorkerStart(function ($server, int $workerId): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -578,7 +579,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->onShutdown(function (): void {});
+        $result = $api->onShutdown(function (): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -587,7 +589,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->onRequestStart(function (Request $req): void {});
+        $result = $api->onRequestStart(function (Request $req): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -596,7 +599,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->onRequestEnd(function (Request $req, Response $res): void {});
+        $result = $api->onRequestEnd(function (Request $req, Response $res): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -618,7 +622,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
     {
         $api = new PHAPI(['default_endpoints' => false]);
 
-        $result = $api->setTaskFinishHandler(function ($server, int $taskId, $data): void {});
+        $result = $api->setTaskFinishHandler(function ($server, int $taskId, $data): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -632,7 +637,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
             'enable_websockets' => true,
         ]);
 
-        $result = $api->setWebSocketHandler(function ($server, $frame, $driver): void {});
+        $result = $api->setWebSocketHandler(function ($server, $frame, $driver): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -644,7 +650,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
             'enable_websockets' => true,
         ]);
 
-        $result = $api->onWebSocketMessage(function ($msg, $conn): void {});
+        $result = $api->onWebSocketMessage(function ($msg, $conn): void {
+        });
 
         $this->assertSame($api, $result);
     }
@@ -664,7 +671,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
 
     public function testRunJobsReturnsArray(): void
     {
-        $api = new PHAPI(['default_endpoints' => false]);
+        $tmpDir = sys_get_temp_dir() . '/phapi_test_jobs_' . bin2hex(random_bytes(4));
+        $api = new PHAPI(['default_endpoints' => false, 'jobs_log_dir' => $tmpDir]);
 
         $api->schedule('quick', 1, function (): string {
             return 'done';
@@ -673,20 +681,26 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
         $results = $api->runJobs();
 
         $this->assertIsArray($results);
+        array_map('unlink', glob($tmpDir . '/*') ?: []);
+        @rmdir($tmpDir);
     }
 
     public function testJobLogsReturnsArray(): void
     {
-        $api = new PHAPI(['default_endpoints' => false]);
+        $tmpDir = sys_get_temp_dir() . '/phapi_test_jobs_' . bin2hex(random_bytes(4));
+        $api = new PHAPI(['default_endpoints' => false, 'jobs_log_dir' => $tmpDir]);
 
         $logs = $api->jobLogs();
 
         $this->assertIsArray($logs);
+        array_map('unlink', glob($tmpDir . '/*') ?: []);
+        @rmdir($tmpDir);
     }
 
     public function testJobHandlerReceivesContainerViaAutowiring(): void
     {
-        $api = new PHAPI(['default_endpoints' => false]);
+        $tmpDir = sys_get_temp_dir() . '/phapi_test_jobs_' . bin2hex(random_bytes(4));
+        $api = new PHAPI(['default_endpoints' => false, 'jobs_log_dir' => $tmpDir]);
         $receivedContainer = null;
 
         $api->schedule('autowired', 1, function (Container $container) use (&$receivedContainer): string {
@@ -698,6 +712,8 @@ final class PHAPIFacadeCharacterizationTest extends SwooleTestCase
 
         $this->assertInstanceOf(Container::class, $receivedContainer);
         $this->assertSame($api->container(), $receivedContainer);
+        array_map('unlink', glob($tmpDir . '/*') ?: []);
+        @rmdir($tmpDir);
     }
 
     // ─── setDebug ─────────────────────────────────────────────────────

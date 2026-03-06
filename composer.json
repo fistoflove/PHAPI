@@ -1,6 +1,6 @@
 {
     "name": "phapi/phapi",
-    "version": "1.5.0",
+    "version": "1.5.1",
     "description": "A lightweight, high-performance wrapper for Swoole HTTP server with routing, middleware, validation, CORS, and async task support",
     "keywords": [
         "swoole",
@@ -28,7 +28,10 @@
     "require": {
         "php": "^8.1",
         "ext-swoole": "*",
-        "guzzlehttp/guzzle": "^7.8",
+        "psr/container": "^2.0"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.60",
         "hyperf/config": "^3.1",
         "hyperf/database": "^3.1",
         "hyperf/db-connection": "^3.1",
@@ -37,13 +40,11 @@
         "open-telemetry/exporter-otlp": "^1.0",
         "open-telemetry/sdk": "^1.0",
         "open-telemetry/sem-conv": "^1.0",
-        "psr/container": "^2.0"
-    },
-    "require-dev": {
-        "friendsofphp/php-cs-fixer": "^3.60",
+        "phpat/phpat": "^0.10.20",
         "phpstan/phpstan": "^1.10",
         "phpstan/phpstan-strict-rules": "^1.5",
-        "phpunit/phpunit": "^9.6 || ^10.0"
+        "phpunit/phpunit": "^9.6 || ^10.0",
+        "tomasvotruba/unused-public": "^1.1"
     },
     "autoload": {
         "psr-4": {
@@ -58,7 +59,15 @@
     "suggest": {
         "ext-swoole": "Required for the Swoole runtime.",
         "ext-redis": "Required for Redis support under Swoole 6.x.",
-        "ext-pdo_mysql": "Required for MySQL support under Swoole 6.x."
+        "ext-pdo_mysql": "Required for MySQL support under Swoole 6.x.",
+        "hyperf/config": "Required for ORM support. Install: composer require hyperf/config hyperf/database hyperf/db-connection",
+        "hyperf/database": "Required for ORM support.",
+        "hyperf/db-connection": "Required for ORM support.",
+        "open-telemetry/api": "Required for tracing. Install: composer require open-telemetry/api open-telemetry/sdk open-telemetry/context-swoole open-telemetry/exporter-otlp open-telemetry/sem-conv",
+        "open-telemetry/sdk": "Required for tracing.",
+        "open-telemetry/context-swoole": "Required for tracing with Swoole.",
+        "open-telemetry/exporter-otlp": "Required for OTLP trace export.",
+        "open-telemetry/sem-conv": "Required for tracing semantic conventions."
     },
     "bin": [
         "bin/phapi-run",

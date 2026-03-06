@@ -21,12 +21,15 @@ use PHAPI\Server\ErrorHandler;
 use PHAPI\Server\HttpKernel;
 use PHAPI\Server\MiddlewareManager;
 use PHAPI\Server\Router;
-use PHAPI\Services\HttpClient;
-use PHAPI\Services\JobsManager;
 use PHAPI\Services\DefaultHttpClient;
 use PHAPI\Services\DefaultTaskRunner;
+use PHAPI\Services\HttpClient;
+use PHAPI\Services\JobsManager;
 use PHAPI\Services\TaskRunner;
 
+/**
+ * @api
+ */
 final class PHAPI
 {
     use Concerns\RoutesRequests;
@@ -272,7 +275,8 @@ final class PHAPI
 
     private function resolveHttpClient(): HttpClient
     {
-        return new DefaultHttpClient();
+        $timeout = (float) ($this->config['http_timeout'] ?? 5.0);
+        return new DefaultHttpClient($timeout);
     }
 
 }

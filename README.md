@@ -5,13 +5,23 @@ PHAPI supports only the `swoole` runtime.
 
 ## Requirements
 
-- PHP 8.0+
+- PHP 8.1+
 - Swoole extension
 
 ## Install
 
 ```bash
 composer require phapi/phapi
+```
+
+### Optional Dependencies
+
+```bash
+# ORM (Hyperf database layer)
+composer require hyperf/config:^3.1 hyperf/database:^3.1 hyperf/db-connection:^3.1
+
+# OpenTelemetry tracing
+composer require open-telemetry/api:^1.0 open-telemetry/sdk:^1.0 open-telemetry/context-swoole:^1.0 open-telemetry/exporter-otlp:^1.0 open-telemetry/sem-conv:^1.0
 ```
 
 ## Quick Start
@@ -23,12 +33,12 @@ require __DIR__ . '/vendor/autoload.php';
 use PHAPI\PHAPI;
 use PHAPI\HTTP\Response;
 
-$api = new PHAPI([
-    'host' => '0.0.0.0',
-    'port' => 9503,
-    'debug' => true,
-    'default_endpoints' => false,
-]);
+$api = PHAPI::builder()
+    ->host('0.0.0.0')
+    ->port(9503)
+    ->debug(true)
+    ->defaultEndpoints(false)
+    ->build();
 
 $api->get('/', function (): Response {
     return Response::json(['message' => 'Hello']);
@@ -48,9 +58,9 @@ $api->container()->bind(
     true
 );
 
-$api->get('/time', function (): Response {
-    $clock = PHAPI::app()?->container()->get(\DateTimeInterface::class);
-    return Response::json(['now' => $clock?->format(DATE_ATOM)]);
+$api->get('/time', function () use ($api): Response {
+    $clock = $api->container()->get(\DateTimeInterface::class);
+    return Response::json(['now' => $clock->format(DATE_ATOM)]);
 });
 ```
 
@@ -61,7 +71,7 @@ Register service providers via config to keep modules isolated.
 ```php
 final class CacheProvider implements \PHAPI\Core\ServiceProviderInterface
 {
-    public function register(\PHAPI\Core\Container $container, \PHAPI\PHAPI $app): void
+    public function register(\PHAPI\Core\Container $container, array $config): void
     {
         $container->singleton(CacheInterface::class, FilesystemCache::class);
     }
@@ -71,11 +81,9 @@ final class CacheProvider implements \PHAPI\Core\ServiceProviderInterface
     }
 }
 
-$api = new PHAPI([
-    'providers' => [
-        CacheProvider::class,
-    ],
-]);
+$api = PHAPI::builder()
+    ->providers([CacheProvider::class])
+    ->build();
 ```
 
 Providers run in the order listed. Later providers can override earlier bindings.
@@ -232,30 +240,28 @@ $api->get('/users', [UserController::class, 'index']);
 - Default values are used when available.
 - Circular dependencies throw a `ContainerException`.
 
-## Tiny Plugin System
+## Container Bindings
 
 ```php
-$api->extend('cache', function (Container $container) {
+$api->container()->singleton('cache', function (\PHAPI\Core\Container $container) {
     return new RedisCache($container->get(Redis::class));
 });
 
-$cache = $api->resolve('cache');
+$cache = $api->container()->get('cache');
 ```
 
-`extend()` is sugar for container bindings. Use providers for reusable packages/modules, and `extend()` for app-local utilities.
-
-Suggested naming to avoid collisions: `vendor.feature` or `feature.variant` (e.g., `metrics.prometheus`).
+Use providers for reusable packages/modules, and direct container bindings for app-local utilities.
 
 ## Swoole WebSocket Example
 
 ```php
-$api = new PHAPI([
-    'enable_websockets' => true,
-    'swoole_settings' => [
+$api = PHAPI::builder()
+    ->enableWebSockets(true)
+    ->swooleSettings([
         'worker_num' => 2,
         'task_worker_num' => 4,
-    ],
-]);
+    ])
+    ->build();
 
 $api->onWebSocketMessage(function (\PHAPI\Services\WebSocketMessage $message, \PHAPI\Services\WebSocketConnection $conn): void {
     $payload = $message->json();
@@ -269,8 +275,8 @@ $api->onWebSocketMessage(function (\PHAPI\Services\WebSocketMessage $message, \P
     }
 });
 
-$api->get('/broadcast', function (): Response {
-    PHAPI::app()?->realtime()->broadcast('updates', ['ok' => true]);
+$api->get('/broadcast', function () use ($api): Response {
+    $api->services()->realtime()->broadcast('updates', ['ok' => true]);
     return Response::json(['sent' => true]);
 });
 ```
@@ -307,13 +313,13 @@ $conn->disconnect(1000, 'done');
 Use `swoole_settings` in your PHAPI config to control worker/task concurrency.
 
 ```php
-$api = new PHAPI([
-    'swoole_settings' => [
+$api = PHAPI::builder()
+    ->swooleSettings([
         'worker_num' => 2,
         'task_worker_num' => 4,
         'max_request' => 1000,
-    ],
-]);
+    ])
+    ->build();
 ```
 
 You can also keep this in `config/phapi.php`:
@@ -362,7 +368,7 @@ $api->dispatchTask([
 Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
-$results = PHAPI::app()?->tasks()->parallel([
+$results = $api->services()->tasks()->parallel([
     'a' => fn() => ['ok' => true],
     'b' => fn() => ['count' => 42],
 ]);
@@ -373,9 +379,9 @@ If any task throws, the task runner throws the first error it encounters.
 You can configure a timeout (seconds) for task completion:
 
 ```php
-$api = new PHAPI([
-    'task_timeout' => 5.0,
-]);
+$api = PHAPI::builder()
+    ->config('task_timeout', 5.0)
+    ->build();
 ```
 
 ## Jobs (Lock/Block)
@@ -404,11 +410,9 @@ PHAPI runs on Swoole only.
 PHAPI registers `/monitor` by default. Disable it if you want to provide your own handler:
 
 ```php
-$api = new PHAPI([
-    'default_endpoints' => [
-        'monitor' => false,
-    ],
-]);
+$api = PHAPI::builder()
+    ->defaultEndpoints(['monitor' => false])
+    ->build();
 ```
 
 
@@ -416,13 +420,12 @@ $api = new PHAPI([
 ## Routing
 
 ```php
-$api->get('/users/{id}', function (): Response {
-    $request = PHAPI::request();
-    return Response::json(['id' => $request?->param('id')]);
+$api->get('/users/{id}', function (Request $request): Response {
+    return Response::json(['id' => $request->param('id')]);
 })->name('users.show');
 
-$api->get('/search/{query?}', function (): Response {
-    return Response::json(['query' => PHAPI::request()?->param('query')]);
+$api->get('/search/{query?}', function (Request $request): Response {
+    return Response::json(['query' => $request->param('query')]);
 })->name('search');
 
 $url = $api->url('users.show', ['id' => 42], ['tab' => 'profile']);
@@ -471,8 +474,8 @@ Named middleware supports arguments: `role:admin|manager`.
 ## Validation
 
 ```php
-$api->post('/users', function (): Response {
-    $data = PHAPI::request()?->body() ?? [];
+$api->post('/users', function (Request $request): Response {
+    $data = $request->body();
     return Response::json(['created' => true, 'user' => $data], 201);
 })->validate([
     'name' => 'required|string|min:2',
@@ -483,16 +486,16 @@ $api->post('/users', function (): Response {
 ## Auth
 
 ```php
-$api = new PHAPI([
-    'auth' => [
+$api = PHAPI::builder()
+    ->config('auth', [
         'default' => 'token',
         'token_resolver' => function (string $token) {
             return $token === 'test-token' ? ['id' => 1, 'roles' => ['admin']] : null;
         },
         'session_key' => 'user',
         'session_allow_in_swoole' => false,
-    ],
-]);
+    ])
+    ->build();
 ```
 
 Helpers:
@@ -546,8 +549,8 @@ Worker-start hooks are executed in registration order. Process spawning remains 
 ## Job Logs Endpoint
 
 ```php
-$api->get('/jobs', function (): Response {
-    return Response::json(['jobs' => PHAPI::app()?->jobLogs()]);
+$api->get('/jobs', function () use ($api): Response {
+    return Response::json(['jobs' => $api->jobLogs()]);
 });
 ```
 
@@ -556,7 +559,7 @@ $api->get('/jobs', function (): Response {
 Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
-$results = $api->tasks()->parallel([
+$results = $api->services()->tasks()->parallel([
     'a' => fn() => ['ok' => true],
     'b' => fn() => ['ok' => true],
 ]);
@@ -569,8 +572,8 @@ $results = $api->tasks()->parallel([
 Requires Swoole. If invoked outside a coroutine, PHAPI will start one when supported.
 
 ```php
-$data = $api->http()->getJson('https://example.com/api');
-$meta = $api->http()->postFormWithMeta('https://example.com/oauth/token', [
+$data = $api->services()->http()->getJson('https://example.com/api');
+$meta = $api->services()->http()->postFormWithMeta('https://example.com/oauth/token', [
     'grant_type' => 'authorization_code',
     'code' => '...',
 ]);
@@ -591,7 +594,7 @@ PHAPI enables Swoole coroutine hooks by default so blocking Redis I/O yields in 
 You can disable this via `enable_coroutine_hooks` in config if needed.
 
 ```php
-$redis = $api->redis();
+$redis = $api->services()->redis();
 $redis->set('greeting', 'hello', 30);
 $value = $redis->get('greeting');
 ```
@@ -614,7 +617,7 @@ Requires a coroutine context (request handlers, jobs, or tasks) and `ext-pdo_mys
 PHAPI enables coroutine hooks by default so blocking PDO I/O yields in coroutines.
 
 ```php
-$mysql = $api->mysql();
+$mysql = $api->services()->mysql();
 $rows = $mysql->query('SELECT 1 AS ok');
 $mysql->execute('INSERT INTO users(name) VALUES (?)', ['Ada']);
 
@@ -652,14 +655,14 @@ Config:
 PHAPI includes opt-in distributed tracing via OpenTelemetry. Register the provider to instrument HTTP, MySQL, Redis, and OpenFGA automatically.
 
 ```php
-$api = new PHAPI([
-    'providers' => [\PHAPI\Telemetry\TracingServiceProvider::class],
-    'telemetry' => [
+$api = PHAPI::builder()
+    ->providers([\PHAPI\Telemetry\TracingServiceProvider::class])
+    ->telemetry([
         'enabled' => (bool) getenv('OTEL_ENABLED'),
         'service_name' => 'my-service',
         'exporter_endpoint' => getenv('OTEL_EXPORTER_OTLP_ENDPOINT') ?: 'http://localhost:4318',
-    ],
-]);
+    ])
+    ->build();
 ```
 
 When enabled, the provider:
@@ -686,18 +689,18 @@ use PHAPI\PHAPI;
 use PHAPI\Providers\OrmMysqlProvider;
 use PHAPI\Database\PhapiModel;
 
-$api = new PHAPI([
-    'providers' => [OrmMysqlProvider::class],
-    'orm' => [
+$api = PHAPI::builder()
+    ->providers([OrmMysqlProvider::class])
+    ->config('orm', [
         'mysql' => [
             'database' => 'app',
             'username' => 'root',
             'password' => '',
         ],
-    ],
-]);
+    ])
+    ->build();
 
-$users = $api->database()->table('users')->where('active', 1)->get();
+$users = $api->services()->database()->table('users')->where('active', 1)->get();
 
 final class User extends PhapiModel
 {
@@ -715,7 +718,7 @@ See `docs/database-orm-mysql.md` for full configuration and usage notes.
 ## Realtime
 
 ```php
-$api->realtime()->broadcast('channel', ['event' => 'ping']);
+$api->services()->realtime()->broadcast('channel', ['event' => 'ping']);
 ```
 
 - Swoole: WebSocket broadcast
@@ -742,19 +745,20 @@ $api->setWebSocketHandler(function ($server, $frame, $driver) {
 Broadcast only to subscribers:
 
 ```php
-$api->realtime()->broadcast('player:123', ['event' => 'ping']);
+$api->services()->realtime()->broadcast('player:123', ['event' => 'ping']);
 ```
 
 The `$driver` argument is the active Swoole runtime driver. Authenticate WebSocket
 connections and validate subscription messages before joining channels.
 
-## Request Context Helpers
+## Request Context
 
-Handlers can be `function (): Response` and access context statically:
+Handlers receive the `Request` via type-hinted parameter injection. Access the app instance from the enclosing scope:
 
 ```php
-$request = PHAPI::request();
-$app = PHAPI::app();
+$api->get('/example', function (Request $request) use ($api): Response {
+    return Response::json(['path' => $request->path()]);
+});
 ```
 
 ## Security Headers
@@ -768,16 +772,16 @@ $api->enableSecurityHeaders([
 ## Request Size Limit
 
 ```php
-$api = new PHAPI([
-    'max_body_bytes' => 1024 * 1024,
-]);
+$api = PHAPI::builder()
+    ->config('max_body_bytes', 1024 * 1024)
+    ->build();
 ```
 
 ## Access Logging
 
 ```php
-$api = new PHAPI([
-    'access_logger' => function ($request, $response, array $meta) {
+$api = PHAPI::builder()
+    ->config('access_logger', function ($request, $response, array $meta) {
         error_log(json_encode([
             'method' => $request->method(),
             'path' => $request->path(),
@@ -785,8 +789,8 @@ $api = new PHAPI([
             'request_id' => $meta['request_id'],
             'duration_ms' => $meta['duration_ms'],
         ]));
-    },
-]);
+    })
+    ->build();
 ```
 
 ## LLM guide file
@@ -847,7 +851,7 @@ use PHAPI\HTTP\Request;
 use PHAPI\HTTP\Response;
 use PHAPI\PHAPI;
 
-$api = new PHAPI();
+$api = PHAPI::builder()->build();
 
 $api->get('/hello', fn() => Response::json(['ok' => true]));
 
