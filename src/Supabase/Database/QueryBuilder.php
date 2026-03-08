@@ -43,7 +43,7 @@ final class QueryBuilder
     public function select(string $columns = '*'): self
     {
         $clone = clone $this;
-        $clone->selectColumns = $columns;
+        $clone->selectColumns = preg_replace('/\s*,\s*/', ',', trim($columns)) ?? $columns;
         return $clone;
     }
 
