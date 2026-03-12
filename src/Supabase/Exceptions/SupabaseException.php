@@ -23,6 +23,7 @@ class SupabaseException extends PhapiException
         ?\Throwable $previous = null,
     ) {
         parent::__construct($message, $httpStatus, $previous);
+        $this->httpStatusCode = $httpStatus > 0 ? $httpStatus : 500;
         $this->httpStatus = $httpStatus;
         $this->details = $details;
         $this->hint = $hint;
