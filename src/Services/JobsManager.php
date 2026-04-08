@@ -422,6 +422,13 @@ class JobsManager
      */
     private function acquireLock(string $name, array $job): ?array
     {
+        // 'none' mode skips file locking entirely — safe for single-instance
+        // deployments (e.g. Cloud Run) where file locks can deadlock Swoole
+        // coroutines due to hooked filesystem calls on high-latency storage.
+        if (($job['lock_mode'] ?? 'skip') === 'none') {
+            return ['handle' => null, 'path' => ''];
+        }
+
         $path = $this->lockPathFor($name);
         $dir = dirname($path);
         if (!is_dir($dir)) {
@@ -451,7 +458,7 @@ class JobsManager
      */
     private function releaseLock(array $lock): void
     {
-        $handle = $lock['handle'];
+        $handle = $lock['handle'] ?? null;
         if (is_resource($handle)) {
             flock($handle, LOCK_UN);
             fclose($handle);
