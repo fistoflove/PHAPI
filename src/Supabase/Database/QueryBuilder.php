@@ -460,6 +460,20 @@ final class QueryBuilder
     {
         $status = $response['status'];
 
+        if ($status <= 0) {
+            $reason = match ($status) {
+                -1 => 'connection failed',
+                -2 => 'request timeout',
+                -3 => 'server reset connection',
+                default => sprintf('transport error (code %d)', $status),
+            };
+
+            throw new SupabaseDatabaseException(
+                sprintf('Supabase request failed: %s', $reason),
+                502
+            );
+        }
+
         if ($this->maybeSingle && ($status === 406 || $response['data'] === null)) {
             return [];
         }

@@ -97,13 +97,13 @@ Key classes:
 - `DatabaseClient` — `from($table)` returns `QueryBuilder`, `rpc($function, $params)`
 - `QueryBuilder` — immutable fluent builder: `select()`, `eq()`, `neq()`, `gt()`, `gte()`, `lt()`, `lte()`, `like()`, `ilike()`, `is()`, `in()`, `contains()`, `containedBy()`, `order()`, `limit()`, `range()`, `single()`, `maybeSingle()` → terminals: `get()`, `insert()`, `update()`, `upsert()`, `delete()`
 - `StorageClient` — `from($bucket)`, `listBuckets()`, `createBucket()`, `deleteBucket()`, `upload()`, `download()`, `delete()`, `copy()`, `move()`, `list()`, `publicUrl()`, `createSignedUrl()`, `createSignedUploadUrl()`
-- `SupabaseTransport` — Swoole coroutine HTTP client supporting GET/POST/PATCH/DELETE/PUT. Non-final for test subclassing.
+- `SupabaseTransport` — Swoole coroutine HTTP client supporting GET/POST/PATCH/DELETE/PUT with per-coroutine keep-alive connection reuse. Within a single request (coroutine), all Supabase calls share one TCP+TLS connection via `Swoole\Coroutine::getContext()`. Non-final for test subclassing.
 
 Middleware: `supabase.auth` extracts bearer token → validates via GoTrue → stores `SupabaseContext` in container. `supabase.role:admin` checks JWT role claim. Custom token resolver supported via constructor.
 
-Exceptions: `SupabaseException` (base, extends `PhapiException`), `SupabaseAuthException`, `SupabaseDatabaseException`, `SupabaseStorageException`. All carry `httpStatus()`, `details()`, `hint()`.
+Exceptions: `SupabaseException` (base, extends `PhapiException`), `SupabaseAuthException`, `SupabaseDatabaseException`, `SupabaseStorageException`. All carry `httpStatus()`, `details()`, `hint()`. `QueryBuilder` throws `SupabaseDatabaseException` (502) on transport-level failures (connection refused, timeout, server reset) instead of silently returning empty results.
 
-Testing: `FakeTransport` (`tests/Supabase/FakeTransport.php`) extends `SupabaseTransport` — queues responses, records requests, no Swoole needed. 92 unit tests across 10 test files.
+Testing: `FakeTransport` (`tests/Supabase/FakeTransport.php`) extends `SupabaseTransport` — queues responses, records requests, no Swoole needed. 97 unit tests across 10 test files.
 
 **Testing approach**: Use `$api->kernel()` to get the `HttpKernel` for in-memory request testing without starting a Swoole server. Create a `Request`, pass to `$kernel->handle()`, assert on the `Response`.
 

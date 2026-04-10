@@ -9,8 +9,13 @@ use PHAPI\Supabase\Exceptions\SupabaseException;
 /**
  * HTTP transport for Supabase API calls.
  *
- * Supports all HTTP methods (GET, POST, PATCH, DELETE) using Swoole's
- * coroutine HTTP client. Subclassable for testing.
+ * Uses Swoole's coroutine HTTP client with keep-alive connection reuse.
+ * Within a single coroutine (i.e. a single request), all Supabase calls
+ * share the same TCP+TLS connection via the coroutine context cache.
+ * This avoids per-query TLS handshake overhead and connection storms
+ * against Supabase's connection pooler.
+ *
+ * Subclassable for testing (see FakeTransport).
  *
  * @api
  */
@@ -100,8 +105,7 @@ class SupabaseTransport
         }
 
         $execute = function () use ($method, $host, $port, $ssl, $path, $body, $headers, $rawBody): array {
-            $client = new \Swoole\Coroutine\Http\Client($host, $port, $ssl);
-            $client->set(['timeout' => $this->config->timeout]);
+            $client = $this->acquireClient($host, $port, $ssl);
             $client->setHeaders($headers);
 
             $encodedBody = $rawBody ?? ($body !== null
@@ -124,7 +128,6 @@ class SupabaseTransport
 
             $status = $client->statusCode;
             $responseBody = $client->body ?? '';
-            $client->close();
 
             $decoded = json_decode($responseBody, true);
             $data = json_last_error() === JSON_ERROR_NONE ? $decoded : null;
@@ -160,5 +163,44 @@ class SupabaseTransport
         }
 
         return $execute();
+    }
+
+    /**
+     * Acquire a Swoole HTTP client, reusing the connection within the current coroutine.
+     *
+     * Clients are cached in the coroutine context and automatically cleaned up
+     * when the coroutine ends. Keep-alive is enabled so the TCP+TLS connection
+     * persists across sequential requests within the same coroutine.
+     */
+    private function acquireClient(string $host, int $port, bool $ssl): \Swoole\Coroutine\Http\Client
+    {
+        $key = sprintf('_phapi_sb_%s_%d', $host, $port);
+
+        if (method_exists(\Swoole\Coroutine::class, 'getContext')) {
+            /** @var \ArrayObject<string, mixed> $context */
+            $context = \Swoole\Coroutine::getContext();
+
+            if (isset($context[$key]) && $context[$key] instanceof \Swoole\Coroutine\Http\Client) {
+                return $context[$key];
+            }
+
+            $client = $this->createClient($host, $port, $ssl);
+            $context[$key] = $client;
+
+            return $client;
+        }
+
+        return $this->createClient($host, $port, $ssl);
+    }
+
+    private function createClient(string $host, int $port, bool $ssl): \Swoole\Coroutine\Http\Client
+    {
+        $client = new \Swoole\Coroutine\Http\Client($host, $port, $ssl);
+        $client->set([
+            'timeout' => $this->config->timeout,
+            'keep_alive' => true,
+        ]);
+
+        return $client;
     }
 }

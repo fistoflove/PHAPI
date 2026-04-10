@@ -390,6 +390,53 @@ final class QueryBuilderTest extends TestCase
         $this->builder()->insert(['title' => 'Duplicate']);
     }
 
+    // ─── CONNECTION ERRORS ─────────────────────────────────────────
+
+    public function testConnectionFailureThrows(): void
+    {
+        $this->transport->addResponse(['data' => null, 'status' => -1, 'body' => '']);
+
+        $this->expectException(SupabaseDatabaseException::class);
+        $this->expectExceptionMessage('connection failed');
+        $this->builder()->get();
+    }
+
+    public function testRequestTimeoutThrows(): void
+    {
+        $this->transport->addResponse(['data' => null, 'status' => -2, 'body' => '']);
+
+        $this->expectException(SupabaseDatabaseException::class);
+        $this->expectExceptionMessage('request timeout');
+        $this->builder()->get();
+    }
+
+    public function testServerResetThrows(): void
+    {
+        $this->transport->addResponse(['data' => null, 'status' => -3, 'body' => '']);
+
+        $this->expectException(SupabaseDatabaseException::class);
+        $this->expectExceptionMessage('server reset connection');
+        $this->builder()->get();
+    }
+
+    public function testConnectionFailureNotMaskedByMaybeSingle(): void
+    {
+        $this->transport->addResponse(['data' => null, 'status' => -1, 'body' => '']);
+
+        $this->expectException(SupabaseDatabaseException::class);
+        $this->expectExceptionMessage('connection failed');
+        $this->builder()->eq('id', 'abc')->maybeSingle()->get();
+    }
+
+    public function testConnectionFailureOnInsertThrows(): void
+    {
+        $this->transport->addResponse(['data' => null, 'status' => -1, 'body' => '']);
+
+        $this->expectException(SupabaseDatabaseException::class);
+        $this->expectExceptionMessage('connection failed');
+        $this->builder()->insert(['title' => 'Test']);
+    }
+
     // ─── IMMUTABILITY ────────────────────────────────────────────────
 
     public function testImmutability(): void

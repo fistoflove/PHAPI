@@ -731,7 +731,7 @@ $api = PHAPI::builder()
     ->build();
 ```
 
-The provider registers `supabase.auth` and `supabase.role` named middleware, binds a request-scoped `SupabaseContext`, and provisions declared buckets in parallel on worker start.
+The provider registers `supabase.auth` and `supabase.role` named middleware, binds a request-scoped `SupabaseContext`, and provisions declared buckets in parallel on worker start. The transport layer uses per-coroutine keep-alive connection reuse — all Supabase calls within a single request share one TCP+TLS connection, avoiding per-query handshake overhead.
 
 ### Auth
 

@@ -35,6 +35,10 @@ The provider:
 - Registers `supabase.auth` and `supabase.role` named middleware
 - Provisions declared buckets in parallel on worker 0 startup (Swoole coroutines)
 
+### Connection Reuse
+
+`SupabaseTransport` caches the Swoole HTTP client in the coroutine context (`Swoole\Coroutine::getContext()`), so all Supabase calls within a single request share one TCP+TLS connection. This eliminates per-query TLS handshake overhead and prevents connection storms against Supabase's connection pooler. The client is automatically cleaned up when the coroutine ends. Keep-alive is enabled, so Swoole transparently reconnects if the server closes an idle connection.
+
 ## Contexts
 
 All Supabase operations happen through a `SupabaseContext`, which holds the user's access token and provides lazy-initialized clients.
@@ -542,7 +546,7 @@ All Supabase errors throw typed exceptions extending `SupabaseException`:
 | Exception | When |
 |---|---|
 | `SupabaseAuthException` | Auth failures (invalid token, wrong password, rate limit) |
-| `SupabaseDatabaseException` | PostgREST errors (table not found, constraint violation) |
+| `SupabaseDatabaseException` | PostgREST errors (table not found, constraint violation) and transport failures (connection refused, timeout, server reset — HTTP 502) |
 | `SupabaseStorageException` | Storage errors (bucket not found, upload failed) |
 | `SupabaseRealtimeException` | Realtime errors (connection failed, channel not subscribed) |
 
