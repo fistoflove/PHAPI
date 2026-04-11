@@ -5,7 +5,7 @@ All notable changes to PHAPI are documented in this file.
 ## Unreleased
 
 ### Fixed
-- **SupabaseTransport** — per-coroutine keep-alive connection reuse via `Swoole\Coroutine::getContext()`. All Supabase calls within a single request now share one TCP+TLS connection, eliminating per-query handshake overhead and connection storms against Supabase's connection pooler.
+- **SupabaseTransport** — `Channel`-based connection pool shared across all coroutines in a worker. Pool of 8 pre-warmed keep-alive connections (configurable via `retries` config). Eliminates TLS handshake storms under concurrent load. Failed connections are discarded and replaced automatically.
 - **QueryBuilder** — transport-level failures (connection refused, timeout, server reset) now throw `SupabaseDatabaseException` (502) instead of being silently swallowed as empty results. Previously, Swoole status codes ≤ 0 could be misinterpreted as "no rows found" by `maybeSingle()`.
 
 ## v1.6.0 — 2026-03-06

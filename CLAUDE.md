@@ -97,7 +97,7 @@ Key classes:
 - `DatabaseClient` — `from($table)` returns `QueryBuilder`, `rpc($function, $params)`
 - `QueryBuilder` — immutable fluent builder: `select()`, `eq()`, `neq()`, `gt()`, `gte()`, `lt()`, `lte()`, `like()`, `ilike()`, `is()`, `in()`, `contains()`, `containedBy()`, `order()`, `limit()`, `range()`, `single()`, `maybeSingle()` → terminals: `get()`, `insert()`, `update()`, `upsert()`, `delete()`
 - `StorageClient` — `from($bucket)`, `listBuckets()`, `createBucket()`, `deleteBucket()`, `upload()`, `download()`, `delete()`, `copy()`, `move()`, `list()`, `publicUrl()`, `createSignedUrl()`, `createSignedUploadUrl()`
-- `SupabaseTransport` — Swoole coroutine HTTP client supporting GET/POST/PATCH/DELETE/PUT with per-coroutine keep-alive connection reuse. Within a single request (coroutine), all Supabase calls share one TCP+TLS connection via `Swoole\Coroutine::getContext()`. Non-final for test subclassing.
+- `SupabaseTransport` — Swoole coroutine HTTP client supporting GET/POST/PATCH/DELETE/PUT with a `Channel`-based connection pool shared across all coroutines in a worker. Pool size defaults to 8 (configurable via `retries` config key). Connections are pre-warmed on first use, borrowed per-query, and returned after each request. Failed connections are discarded and replaced. Non-final for test subclassing.
 
 Middleware: `supabase.auth` extracts bearer token → validates via GoTrue → stores `SupabaseContext` in container. `supabase.role:admin` checks JWT role claim. Custom token resolver supported via constructor.
 

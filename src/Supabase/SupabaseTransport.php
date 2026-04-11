@@ -9,11 +9,10 @@ use PHAPI\Supabase\Exceptions\SupabaseException;
 /**
  * HTTP transport for Supabase API calls.
  *
- * Uses Swoole's coroutine HTTP client with keep-alive connection reuse.
- * Within a single coroutine (i.e. a single request), all Supabase calls
- * share the same TCP+TLS connection via the coroutine context cache.
- * This avoids per-query TLS handshake overhead and connection storms
- * against Supabase's connection pooler.
+ * Uses a Swoole Channel-based connection pool shared across all coroutines
+ * within a worker process. Pre-warmed connections avoid TLS handshake storms
+ * under concurrent load. Each coroutine borrows a connection, uses it, and
+ * returns it to the pool.
  *
  * Subclassable for testing (see FakeTransport).
  *
@@ -21,6 +20,14 @@ use PHAPI\Supabase\Exceptions\SupabaseException;
  */
 class SupabaseTransport
 {
+    private const DEFAULT_POOL_SIZE = 8;
+
+    /** @var \Swoole\Coroutine\Channel|null */
+    private $pool = null;
+
+    private string $poolHost = '';
+    private int $poolPort = 0;
+
     public function __construct(
         private readonly SupabaseConfig $config,
     ) {
@@ -105,29 +112,48 @@ class SupabaseTransport
         }
 
         $execute = function () use ($method, $host, $port, $ssl, $path, $body, $headers, $rawBody): array {
-            $client = $this->acquireClient($host, $port, $ssl);
-            $client->setHeaders($headers);
+            $client = $this->borrowClient($host, $port, $ssl);
 
-            $encodedBody = $rawBody ?? ($body !== null
-                ? json_encode($body === [] ? new \stdClass() : $body, JSON_THROW_ON_ERROR)
-                : null);
+            try {
+                $client->setHeaders($headers);
 
-            $method = strtoupper($method);
+                $encodedBody = $rawBody ?? ($body !== null
+                    ? json_encode($body === [] ? new \stdClass() : $body, JSON_THROW_ON_ERROR)
+                    : null);
 
-            if ($method === 'GET') {
-                $client->get($path);
-            } elseif ($method === 'POST') {
-                $client->post($path, $encodedBody ?? '');
-            } else {
-                $client->setMethod($method);
-                if ($encodedBody !== null) {
-                    $client->setData($encodedBody);
+                $method = strtoupper($method);
+
+                if ($method === 'GET') {
+                    $client->get($path);
+                } elseif ($method === 'POST') {
+                    $client->post($path, $encodedBody ?? '');
+                } else {
+                    $client->setMethod($method);
+                    if ($encodedBody !== null) {
+                        $client->setData($encodedBody);
+                    }
+                    $client->execute($path);
                 }
-                $client->execute($path);
-            }
 
-            $status = $client->statusCode;
-            $responseBody = $client->body ?? '';
+                $status = $client->statusCode;
+                $responseBody = $client->body ?? '';
+
+                // If connection failed, discard this client and create a fresh one for the pool
+                if ($status <= 0) {
+                    $client->close();
+                    $this->returnClient($this->createClient($host, $port, $ssl));
+                } else {
+                    $this->returnClient($client);
+                }
+            } catch (\Throwable $e) {
+                // On any error, discard the client and replenish the pool
+                try {
+                    $client->close();
+                } catch (\Throwable) {
+                }
+                $this->returnClient($this->createClient($host, $port, $ssl));
+                throw $e;
+            }
 
             $decoded = json_decode($responseBody, true);
             $data = json_last_error() === JSON_ERROR_NONE ? $decoded : null;
@@ -166,31 +192,63 @@ class SupabaseTransport
     }
 
     /**
-     * Acquire a Swoole HTTP client, reusing the connection within the current coroutine.
+     * Borrow a client from the connection pool.
      *
-     * Clients are cached in the coroutine context and automatically cleaned up
-     * when the coroutine ends. Keep-alive is enabled so the TCP+TLS connection
-     * persists across sequential requests within the same coroutine.
+     * The pool is lazily initialized on first use. If the pool is empty,
+     * the coroutine blocks until a client is returned by another coroutine
+     * (with a timeout equal to the configured request timeout).
      */
-    private function acquireClient(string $host, int $port, bool $ssl): \Swoole\Coroutine\Http\Client
+    private function borrowClient(string $host, int $port, bool $ssl): \Swoole\Coroutine\Http\Client
     {
-        $key = sprintf('_phapi_sb_%s_%d', $host, $port);
+        $this->ensurePool($host, $port, $ssl);
 
-        if (method_exists(\Swoole\Coroutine::class, 'getContext')) {
-            /** @var \ArrayObject<string, mixed> $context */
-            $context = \Swoole\Coroutine::getContext();
+        /** @var \Swoole\Coroutine\Channel $pool */
+        $pool = $this->pool;
 
-            if (isset($context[$key]) && $context[$key] instanceof \Swoole\Coroutine\Http\Client) {
-                return $context[$key];
-            }
-
-            $client = $this->createClient($host, $port, $ssl);
-            $context[$key] = $client;
-
-            return $client;
+        $client = $pool->pop($this->config->timeout);
+        if ($client === false) {
+            // Pool exhausted and timed out — create overflow client
+            return $this->createClient($host, $port, $ssl);
         }
 
-        return $this->createClient($host, $port, $ssl);
+        return $client;
+    }
+
+    /**
+     * Return a client to the pool. If the pool is full, the client is discarded.
+     */
+    private function returnClient(\Swoole\Coroutine\Http\Client $client): void
+    {
+        if ($this->pool === null) {
+            $client->close();
+            return;
+        }
+
+        // Non-blocking push — if pool is full, discard
+        if (!$this->pool->push($client, 0.0)) {
+            $client->close();
+        }
+    }
+
+    /**
+     * Lazily initialize the connection pool with pre-warmed clients.
+     */
+    private function ensurePool(string $host, int $port, bool $ssl): void
+    {
+        if ($this->pool !== null && $this->poolHost === $host && $this->poolPort === $port) {
+            return;
+        }
+
+        $poolSize = $this->config->retries > 0 ? $this->config->retries : self::DEFAULT_POOL_SIZE;
+
+        $this->pool = new \Swoole\Coroutine\Channel($poolSize);
+        $this->poolHost = $host;
+        $this->poolPort = $port;
+
+        // Pre-warm all pool slots
+        for ($i = 0; $i < $poolSize; $i++) {
+            $this->pool->push($this->createClient($host, $port, $ssl));
+        }
     }
 
     private function createClient(string $host, int $port, bool $ssl): \Swoole\Coroutine\Http\Client
