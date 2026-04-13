@@ -67,6 +67,100 @@ final class SwooleTaskRunnerTest extends SwooleTestCase
         $this->assertGreaterThan(0, $results['second']);
     }
 
+    public function testParallelRespectsMaxConcurrency(): void
+    {
+        if (!function_exists('Swoole\\Coroutine\\run')) {
+            $this->markTestSkipped('Swoole coroutine runner not available.');
+        }
+
+        $runner = new SwooleTaskRunner();
+        $maxObserved = 0;
+        $active = 0;
+        $results = null;
+
+        \Swoole\Coroutine\run(function () use ($runner, &$results, &$maxObserved, &$active): void {
+            $tasks = [];
+            for ($i = 0; $i < 10; $i++) {
+                $tasks["t{$i}"] = static function () use (&$maxObserved, &$active): int {
+                    $active++;
+                    if ($active > $maxObserved) {
+                        $maxObserved = $active;
+                    }
+                    \Swoole\Coroutine::sleep(0.01);
+                    $active--;
+                    return \Swoole\Coroutine::getCid();
+                };
+            }
+            $results = $runner->parallel($tasks, concurrency: 3);
+        });
+
+        $this->assertLessThanOrEqual(3, $maxObserved);
+        $this->assertGreaterThan(0, $maxObserved);
+        $this->assertIsArray($results);
+        $this->assertCount(10, $results);
+    }
+
+    public function testParallelConcurrencyOneIsSequential(): void
+    {
+        if (!function_exists('Swoole\\Coroutine\\run')) {
+            $this->markTestSkipped('Swoole coroutine runner not available.');
+        }
+
+        $runner = new SwooleTaskRunner();
+        $order = [];
+        $results = null;
+
+        \Swoole\Coroutine\run(function () use ($runner, &$results, &$order): void {
+            $tasks = [];
+            for ($i = 0; $i < 5; $i++) {
+                $idx = $i;
+                $tasks["t{$i}"] = static function () use ($idx, &$order): int {
+                    $order[] = $idx;
+                    \Swoole\Coroutine::sleep(0.001);
+                    return $idx;
+                };
+            }
+            $results = $runner->parallel($tasks, concurrency: 1);
+        });
+
+        $this->assertSame([0, 1, 2, 3, 4], $order);
+        $this->assertIsArray($results);
+        $this->assertCount(5, $results);
+    }
+
+    public function testParallelConcurrencyNullIsUnlimited(): void
+    {
+        if (!function_exists('Swoole\\Coroutine\\run')) {
+            $this->markTestSkipped('Swoole coroutine runner not available.');
+        }
+
+        $runner = new SwooleTaskRunner();
+        $maxObserved = 0;
+        $active = 0;
+        $results = null;
+
+        \Swoole\Coroutine\run(function () use ($runner, &$results, &$maxObserved, &$active): void {
+            $tasks = [];
+            for ($i = 0; $i < 5; $i++) {
+                $tasks["t{$i}"] = static function () use (&$maxObserved, &$active): int {
+                    $active++;
+                    if ($active > $maxObserved) {
+                        $maxObserved = $active;
+                    }
+                    \Swoole\Coroutine::sleep(0.02);
+                    $active--;
+                    return \Swoole\Coroutine::getCid();
+                };
+            }
+            $results = $runner->parallel($tasks, concurrency: null);
+        });
+
+        // With null concurrency and sleep, all 5 should run at once
+        $this->assertSame(5, $maxObserved);
+        $this->assertIsArray($results);
+        $this->assertCount(5, $results);
+    }
+
     public function testParallelTimesOut(): void
     {
         if (!function_exists('Swoole\\Coroutine\\run')) {

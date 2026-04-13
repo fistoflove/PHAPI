@@ -118,7 +118,38 @@ final class SwooleTaskRunnerErrorTest extends SwooleTestCase
         $this->assertSame([], $result);
     }
 
-    // --- 3e. Results keyed correctly despite mixed success/failure ---
+    // --- 3e. Partial failure with concurrency limit ---
+
+    public function testPartialFailureWithConcurrencyPreservesOtherResults(): void
+    {
+        if (!function_exists('Swoole\\Coroutine\\run')) {
+            $this->markTestSkipped('Swoole coroutine runner not available.');
+        }
+
+        $runner = new SwooleTaskRunner();
+        $thrown = null;
+
+        \Swoole\Coroutine\run(function () use ($runner, &$thrown): void {
+            try {
+                $runner->parallel([
+                    'a' => static fn (): string => 'result-a',
+                    'b' => static function (): never {
+                        throw new \RuntimeException('b-failed');
+                    },
+                    'c' => static fn (): string => 'result-c',
+                    'd' => static fn (): string => 'result-d',
+                    'e' => static fn (): string => 'result-e',
+                ], concurrency: 2);
+            } catch (\RuntimeException $e) {
+                $thrown = $e;
+            }
+        });
+
+        $this->assertNotNull($thrown);
+        $this->assertSame('b-failed', $thrown->getMessage());
+    }
+
+    // --- 3f. Results keyed correctly despite mixed success/failure ---
 
     public function testSuccessfulResultsPreservedAlongsideFailure(): void
     {

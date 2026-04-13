@@ -16,12 +16,16 @@ class SwooleTaskRunner implements TaskRunner
     }
 
     /**
-     * Run tasks in parallel using Swoole coroutines when available.
+     * Run tasks in parallel using Swoole coroutines.
+     *
+     * When $concurrency is set, at most that many tasks run simultaneously
+     * using a Channel-based semaphore. When null, all tasks run at once.
      *
      * @param array<string, callable(): mixed> $tasks
+     * @param int|null $concurrency Maximum concurrent tasks. Null = unlimited.
      * @return array<string, mixed>
      */
-    public function parallel(array $tasks): array
+    public function parallel(array $tasks, ?int $concurrency = null): array
     {
         if (!class_exists('Swoole\\Coroutine')) {
             throw new \RuntimeException('Swoole coroutines are not available.');
@@ -34,22 +38,36 @@ class SwooleTaskRunner implements TaskRunner
         $results = [];
         $errors = [];
 
-        $runner = function () use ($tasks, &$results, &$errors): void {
+        $runner = function () use ($tasks, $concurrency, &$results, &$errors): void {
             $timeout = $this->timeoutSeconds;
+
             if (class_exists('Swoole\\Coroutine\\WaitGroup')) {
                 $waitGroup = new \Swoole\Coroutine\WaitGroup();
+                $semaphore = ($concurrency !== null && $concurrency > 0)
+                    ? new \Swoole\Coroutine\Channel($concurrency)
+                    : null;
+
                 foreach ($tasks as $key => $task) {
+                    // Acquire semaphore slot before spawning — blocks if limit reached
+                    if ($semaphore !== null) {
+                        $semaphore->push(true);
+                    }
+
                     $waitGroup->add();
-                    \Swoole\Coroutine::create(function () use ($task, $key, &$results, &$errors, $waitGroup) {
+                    \Swoole\Coroutine::create(function () use ($task, $key, &$results, &$errors, $waitGroup, $semaphore) {
                         try {
                             $results[$key] = $task();
                         } catch (\Throwable $e) {
                             $errors[$key] = $e;
                         } finally {
+                            if ($semaphore !== null) {
+                                $semaphore->pop();
+                            }
                             $waitGroup->done();
                         }
                     });
                 }
+
                 $completed = $waitGroup->wait($timeout ?? -1);
                 if ($timeout !== null && $completed === false) {
                     throw new \RuntimeException('Task runner timed out.');
@@ -57,17 +75,30 @@ class SwooleTaskRunner implements TaskRunner
                 return;
             }
 
+            // Channel fallback when WaitGroup is unavailable
             if (!class_exists('Swoole\\Coroutine\\Channel')) {
                 throw new \RuntimeException('Swoole coroutine channels are not available.');
             }
 
             $channel = new \Swoole\Coroutine\Channel(count($tasks));
+            $semaphore = ($concurrency !== null && $concurrency > 0)
+                ? new \Swoole\Coroutine\Channel($concurrency)
+                : null;
+
             foreach ($tasks as $key => $task) {
-                \Swoole\Coroutine::create(function () use ($task, $key, $channel) {
+                if ($semaphore !== null) {
+                    $semaphore->push(true);
+                }
+
+                \Swoole\Coroutine::create(function () use ($task, $key, $channel, $semaphore) {
                     try {
                         $channel->push(['key' => $key, 'value' => $task()]);
                     } catch (\Throwable $e) {
                         $channel->push(['key' => $key, 'error' => $e]);
+                    } finally {
+                        if ($semaphore !== null) {
+                            $semaphore->pop();
+                        }
                     }
                 });
             }
